@@ -19,6 +19,7 @@
 Require Import Coqlib Maps.
 Require Import AST Integers Values Events Memory Globalenvs Smallstep.
 Require Import Op Registers.
+Require Import RTL.
 
 (** * Abstract syntax *)
 
@@ -75,182 +76,19 @@ Inductive instruction: Type :=
       (** [Ijumptable arg tbl] transitions to the node that is the [n]-th
           element of the list [tbl], where [n] is the unsigned integer
           value of register [arg]. *)
-  | Ireturn: option reg -> instruction.
+  | Ireturn: option reg -> instruction
       (** [Ireturn] terminates the execution of the current function
           (it has no successor).  It returns the value of the given
           register, or [Vundef] if none is given. *)
-
-          (** * Operational semantics *)
-
-          Definition regset := Regmap.t val.
-
-Fixpoint init_regs (vl: list val) (rl: list reg) {struct rl} : regset :=
-  match rl, vl with
-  | r1 :: rs, v1 :: vs => Regmap.set r1 v1 (init_regs vs rs)
-  | _, _ => Regmap.init Vundef
-  end.
-
-Section Program.
-  Context {A : Type}.
-Definition code_ : Type := PTree.t A.
-
-Record function_ : Type := mkfunction {
-  fn_sig: signature;
-  fn_params: list reg;
-  fn_stacksize: Z;
-  fn_code: code_ ;
-  fn_entrypoint: node
-}.
-
-(** A function description comprises a control-flow graph (CFG) [fn_code]
-    (a partial finite mapping from nodes to instructions).  As in Cminor,
-    [fn_sig] is the function signature and [fn_stacksize] the number of bytes
-    for its stack-allocated activation record.  [fn_params] is the list
-    of registers that are bound to the values of arguments at call time.
-    [fn_entrypoint] is the node of the first instruction of the function
-    in the CFG. *)
-
-Definition fundef_ := AST.fundef function_.
-
-Definition program_ := AST.program fundef_ unit.
-
-Definition funsig_ (fd: fundef_) :=
-  match fd with
-  | Internal f => fn_sig f
-  | External ef => ef_sig ef
-  end.
+  | Inotimplemented : instruction.
 
 
-Definition genv_ := Genv.t fundef_ unit.
 
-
-(** The dynamic semantics of RTL is given in small-step style, as a
-  set of transitions between states.  A state captures the current
-  point in the execution.  Three kinds of states appear in the transitions:
-
-- [State cs f sp pc rs m] describes an execution point within a function.
-  [f] is the current function.
-  [sp] is the pointer to the stack block for its current activation
-     (as in Cminor).
-  [pc] is the current program point (CFG node) within the code [c].
-  [rs] gives the current values for the pseudo-registers.
-  [m] is the current memory state.
-- [Callstate cs f args m] is an intermediate state that appears during
-  function calls.
-  [f] is the function definition that we are calling.
-  [args] (a list of values) are the arguments for this call.
-  [m] is the current memory state.
-- [Returnstate cs v m] is an intermediate state that appears when a
-  function terminates and returns to its caller.
-  [v] is the return value and [m] the current memory state.
-
-In all three kinds of states, the [cs] parameter represents the call stack.
-It is a list of frames [Stackframe res f sp pc rs].  Each frame represents
-a function call in progress.
-[res] is the pseudo-register that will receive the result of the call.
-[f] is the calling function.
-[sp] is its stack pointer.
-[pc] is the program point for the instruction that follows the call.
-[rs] is the state of registers in the calling function.
-*)
-
-Inductive stackframe : Type :=
-  | Stackframe:
-      forall (res: reg)            (**r where to store the result *)
-             (f: function_)         (**r calling function *)
-             (sp: val)             (**r stack pointer in calling function *)
-             (pc: node)            (**r program point in calling function *)
-             (rs: regset),         (**r register state in calling function *)
-      stackframe.
-
-Inductive state : Type :=
-  | State:
-      forall (stack: list stackframe) (**r call stack *)
-             (f: function_)            (**r current function *)
-             (sp: val)                (**r stack pointer *)
-             (pc: node)               (**r current program point in [c] *)
-             (rs: regset)             (**r register state *)
-             (m: mem),                (**r memory state *)
-      state
-  | Callstate:
-      forall (stack: list stackframe) (**r call stack *)
-             (f: fundef_)              (**r function to call *)
-             (args: list val)         (**r arguments to the call *)
-             (m: mem),                (**r memory state *)
-      state
-  | Returnstate:
-      forall (stack: list stackframe) (**r call stack *)
-             (v: val)                 (**r return value for the call *)
-             (m: mem),                (**r memory state *)
-      state.
-
-Definition find_function (ge : genv_)
-      (ros: reg + ident) (rs: regset) : option fundef_ :=
-  match ros with
-  | inl r => Genv.find_funct ge rs#r
-  | inr symb =>
-      match Genv.find_symbol ge symb with
-      | None => None
-      | Some b => Genv.find_funct_ptr ge b
-      end
-  end.
-
-  (** Execution of whole programs are described as sequences of transitions
-  from an initial state to a final state.  An initial state is a [Callstate]
-  corresponding to the invocation of the ``main'' function of the program
-  without arguments and with an empty call stack. *)
-
-Inductive initial_state (p: program_): state -> Prop :=
-| initial_state_intro: forall b f m0,
-    let ge := Genv.globalenv p in
-    Genv.init_mem p = Some m0 ->
-    Genv.find_symbol ge p.(prog_main) = Some b ->
-    Genv.find_funct_ptr ge b = Some f ->
-    funsig_ f = signature_main ->
-    initial_state p (Callstate nil f nil m0).
-
-(** A final state is a [Returnstate] with an empty call stack. *)
-
-Inductive final_state: state -> int -> Prop :=
-| final_state_intro: forall r m,
-    final_state (Returnstate nil (Vint r) m) r.
-
-(** The small-step semantics for a program. *)
-
-(** Maximum PC (node number) in the CFG of a function.  All nodes of
-  the CFG of [f] are between 1 and [max_pc_function f] (inclusive). *)
-
-  Definition max_pc_function (f: function_) :=
-    PTree.fold (fun m pc i => Pos.max m pc) f.(fn_code) 1%positive.
-  
-  Lemma max_pc_function_sound:
-    forall f pc i, f.(fn_code)!pc = Some i -> Ple pc (max_pc_function f).
-  Proof.
-    intros until i. unfold max_pc_function.
-    apply PTree_Properties.fold_rec with (P := fun c m => c!pc = Some i -> Ple pc m).
-    (* extensionality *)
-    intros. apply H0. rewrite H; auto.
-    (* base case *)
-    rewrite PTree.gempty. congruence.
-    (* inductive case *)
-    intros. rewrite PTree.gsspec in H2. destruct (peq pc k).
-    inv H2. extlia.
-    apply Ple_trans with a. auto. extlia.
-  Qed.
-
-End Program.
-
-Definition code := @code_ instruction.
-Definition function := @function_ instruction.
-Definition fundef := @fundef_ instruction.
-Definition program := @program_ instruction.
-Definition funsig := @funsig_ instruction.
-Definition genv := @genv_ instruction.
 
 
 Section RELSEM.
-Variable ge: genv.
 
+Variable ge: @genv instruction.
 
 
 (** The transitions are presented as an inductive predicate
@@ -261,7 +99,7 @@ Variable ge: genv.
 Inductive step: state -> trace -> state -> Prop :=
   | exec_Inop:
       forall s f sp pc rs m pc',
-      (fn_code f)!pc = Some(Inop pc') ->
+      (fn_code f)!pc = Some((Inop pc')) ->
       step (State s f sp pc rs m)
         E0 (State s f sp pc' rs m)
   | exec_Iop:
@@ -371,7 +209,7 @@ Qed.
 
 End RELSEM.
 
-
+(** The small-step semantics for a program. *)
 
 Definition semantics (p: program) :=
   Semantics step (initial_state p) final_state (Genv.globalenv p).
@@ -431,6 +269,7 @@ Definition successors_instr (i: instruction) : list node :=
   | Icond cond args ifso ifnot => ifso :: ifnot :: nil
   | Ijumptable arg tbl => tbl
   | Ireturn optarg => nil
+  | Inotimplemented => nil
   end.
 
 Definition successors_map (f: function) : PTree.t (list node) :=
@@ -453,6 +292,7 @@ Definition instr_uses (i: instruction) : list reg :=
   | Ijumptable arg tbl => arg :: nil
   | Ireturn None => nil
   | Ireturn (Some arg) => arg :: nil
+  | Inotimplemented => nil
   end.
 
 (** The register defined by an instruction, if any *)
@@ -470,9 +310,8 @@ Definition instr_defs (i: instruction) : option reg :=
   | Icond cond args ifso ifnot => None
   | Ijumptable arg tbl => None
   | Ireturn optarg => None
+  | Inotimplemented => None
   end.
-
-
 
 (** Maximum pseudo-register mentioned in a function.  All results or arguments
   of an instruction of [f], as well as all parameters of [f], are between
@@ -495,6 +334,7 @@ Definition max_reg_instr (m: positive) (pc: node) (i: instruction) :=
   | Ijumptable arg tbl => Pos.max arg m
   | Ireturn None => m
   | Ireturn (Some arg) => Pos.max arg m
+  | Inotimplemented => m
   end.
 
 Definition max_reg_function (f: function) :=
@@ -542,6 +382,7 @@ Proof.
 - destruct H. right; subst; extlia. auto.
 - intuition. subst; extlia.
 - destruct o; simpl in H; intuition. subst; extlia.
+- destruct H.
 Qed.
 
 Lemma max_reg_function_def:
@@ -592,3 +433,33 @@ Proof.
   { apply X; auto. }
   unfold max_reg_function. extlia.
 Qed.
+
+
+Program Definition to_RTL_instruction (i : instruction) (IComplete : i <> Inotimplemented) : RTL.instruction :=
+  match i with
+  | Inop s => RTL.Inop s
+  | Iop op args res s => RTL.Iop op args res s
+  | Iload chunk addr args dst s => RTL.Iload chunk addr args dst s
+  | Istore chunk addr args src s => RTL.Istore chunk addr args src s
+  | Icall sig ros args res s => RTL.Icall sig ros args res s
+  | Itailcall sig ros args => RTL.Itailcall sig ros args
+  | Ibuiltin ef args res s => RTL.Ibuiltin ef args res s
+  | Icond cond args ifso ifnot => RTL.Icond cond args ifso ifnot
+  | Ijumptable arg tbl => RTL.Ijumptable arg tbl
+  | Ireturn optarg => RTL.Ireturn optarg
+  | Inotimplemented => _
+  end.
+
+Definition to_RTL_Incomplete_instruction (i : RTL.instruction) : instruction :=
+  match i with
+  | RTL.Inop s => Inop s
+  | RTL.Iop op args res s => Iop op args res s
+  | RTL.Iload chunk addr args dst s => Iload chunk addr args dst s
+  | RTL.Istore chunk addr args src s => Istore chunk addr args src s
+  | RTL.Icall sig ros args res s => Icall sig ros args res s
+  | RTL.Itailcall sig ros args => Itailcall sig ros args
+  | RTL.Ibuiltin ef args res s => Ibuiltin ef args res s
+  | RTL.Icond cond args ifso ifnot => Icond cond args ifso ifnot
+  | RTL.Ijumptable arg tbl => Ijumptable arg tbl
+  | RTL.Ireturn optarg => Ireturn optarg
+  end.

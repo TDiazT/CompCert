@@ -14,7 +14,7 @@
 
 Require Import Coqlib Maps Errors Integers Floats Lattice Kildall.
 Require Import AST Linking.
-Require Import Memory Registers Op RTL.
+Require Import Memory Registers Op RTL_Incomplete RTL.
 Require Import ValueDomain ValueAnalysis NeedDomain NeedOp.
 
 (** * Part 1: the static analysis *)
@@ -160,7 +160,7 @@ Definition analyze (approx: PMap.t VA.t) (f: function): option (PMap.t NA.t) :=
 (** * Part 2: the code transformation *)
 
 Definition transf_instr (approx: PMap.t VA.t) (an: PMap.t NA.t)
-                        (pc: node) (instr: instruction) :=
+                        (pc: node) (instr: instruction) : RTL_Incomplete.instruction :=
   match instr with
   | Iop op args res s =>
       let nres := nreg (fst an!!pc) res in
@@ -178,42 +178,49 @@ Definition transf_instr (approx: PMap.t VA.t) (an: PMap.t NA.t)
   | Iload chunk addr args dst s =>
       let ndst := nreg (fst an!!pc) dst in
       if is_dead ndst then
-        Inop s
+        RTL_Incomplete.Inop s
       else if is_int_zero ndst then
-        Iop (Ointconst Int.zero) nil dst s
+        RTL_Incomplete.Iop (Ointconst Int.zero) nil dst s
       else
-        instr
+        to_RTL_Incomplete_instruction instr
   | Istore chunk addr args src s =>
       let p := aaddressing approx!!pc addr args in
       if nmem_contains (snd an!!pc) p (size_chunk chunk)
-      then instr
-      else Inop s
+      then to_RTL_Incomplete_instruction instr
+      else RTL_Incomplete.Inop s
   | Ibuiltin (EF_memcpy sz al) (dst :: src :: nil) res s =>
       if nmem_contains (snd an!!pc) (aaddr_arg approx!!pc dst) sz
-      then instr
-      else Inop s
+      then to_RTL_Incomplete_instruction instr
+      else RTL_Incomplete.Inop s
   | Icond cond args s1 s2 =>
-      if peq s1 s2 then Inop s1 else instr
+      if peq s1 s2 then RTL_Incomplete.Inop s1 else to_RTL_Incomplete_instruction instr
   | _ =>
-      instr
+      to_RTL_Incomplete_instruction instr
   end.
 
-Definition transf_function (rm: romem) (f: function) : res function :=
+Definition transf_function (rm: romem) (f: function) : res RTL_Incomplete.function :=
   let approx := ValueAnalysis.analyze rm f in
   match analyze approx f with
   | Some an =>
-      OK {| fn_sig := f.(fn_sig);
-            fn_params := f.(fn_params);
-            fn_stacksize := f.(fn_stacksize);
-            fn_code := PTree.map (transf_instr approx an) f.(fn_code);
-            fn_entrypoint := f.(fn_entrypoint) |}
+      OK {| RTL_Incomplete.fn_sig := f.(fn_sig);
+            RTL_Incomplete.fn_params := f.(fn_params);
+            RTL_Incomplete.fn_stacksize := f.(fn_stacksize);
+            RTL_Incomplete.fn_code := PTree.map (transf_instr approx an) f.(fn_code);
+            RTL_Incomplete.fn_entrypoint := f.(fn_entrypoint) |}
   | None =>
       Error (msg "Neededness analysis failed")
   end.
 
-Definition transf_fundef (rm: romem) (fd: fundef) : res fundef :=
-  AST.transf_partial_fundef (transf_function rm) fd.
 
-Definition transf_program (p: program) : res program :=
-  transform_partial_program (transf_fundef (romem_for p)) p.
+Definition transf_fundef_aux {A} (transf_f : romem -> function -> res A) (rm: romem) (fd: fundef) : res (AST.fundef A) :=
+  AST.transf_partial_fundef (transf_f rm) fd.
 
+(* Definition transf_fundef (rm: romem) (fd: fundef) : res fundef := *)
+  (* transf_fundef_aux rm fd transf_function. *)
+
+  (* TODO : Maybe parameterize by transf_f *)
+Definition transf_program_aux (p: program) transf_f: res RTL_Incomplete.program :=
+  transform_partial_program (transf_fundef_aux transf_f (romem_for p) ) p.
+
+Definition transf_program (p: program) : res RTL_Incomplete.program :=
+  transf_program_aux p transf_function.
