@@ -82,13 +82,18 @@ Inductive instruction: Type :=
           register, or [Vundef] if none is given. *)
   | Inotimplemented : instruction.
 
-
-
-
+Notation code := (@code_ instruction).
+Notation function := (@function_ instruction).
+Notation fundef := (@fundef_ instruction).
+Notation program := (@program_ instruction).
+Notation funsig := (@funsig_ instruction).
+Notation genv := (@genv_ instruction).
+Notation find_function := (@find_function_ instruction).
+Notation state := (@state_ instruction).
 
 Section RELSEM.
 
-Variable ge: @genv instruction.
+Variable ge: genv.
 
 
 (** The transitions are presented as an inductive predicate
