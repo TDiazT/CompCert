@@ -239,7 +239,7 @@ Definition definitive_initializer (init: list init_data) : bool :=
   | _ => true
   end.
 
-Definition alloc_global (rm: romem) (idg: ident * globdef fundef unit): romem :=
+(* Definition alloc_global (rm: romem) (idg: ident * globdef fundef unit): romem :=
   match idg with
   | (id, Gfun f) =>
       PTree.remove id rm
@@ -250,7 +250,20 @@ Definition alloc_global (rm: romem) (idg: ident * globdef fundef unit): romem :=
   end.
 
 Definition romem_for (p: program) : romem :=
+  List.fold_left alloc_global p.(prog_defs) (PTree.empty _). *)
+  Definition alloc_global {A} (rm: romem) (idg: ident * globdef (@fundef_ A) unit): romem :=
+  match idg with
+  | (id, Gfun f) =>
+      PTree.remove id rm
+  | (id, Gvar v) =>
+      if v.(gvar_readonly) && negb v.(gvar_volatile) && definitive_initializer v.(gvar_init)
+      then PTree.set id (store_init_data_list (ablock_init Pbot) 0 v.(gvar_init)) rm
+      else PTree.remove id rm
+  end.
+
+Definition romem_for {A} (p: @program_ A) : romem :=
   List.fold_left alloc_global p.(prog_defs) (PTree.empty _).
+  
 
 (** * Soundness proof *)
 

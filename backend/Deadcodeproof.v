@@ -26,15 +26,9 @@ Require Import ValueDomain ValueAnalysis NeedDomain NeedOp Deadcode.
 
 (* Definition match_prog_aux trans_f (prog : program) (tprog: RTL_Incomplete.program) := *)
 (* match_program (fun cu f tf => transf_fundef_aux trans_f (romem_for cu) f = OK tf) eq prog tprog. *)
-Definition match_prog_aux {A} trans_f (prog : program) (tprog: AST.program (AST.fundef A) unit) :=
-  match_program (fun cu f tf => transf_fundef_aux trans_f (romem_for cu) f = OK tf) eq prog tprog.
+Definition match_prog_aux {A B} transf_f (prog : @program_ A) (tprog: @program_ B) := 
+  match_program (fun cu f tf => AST.transf_partial_fundef (transf_f (romem_for cu)) f = OK tf) eq prog tprog.
 
-
-Lemma transf_program_match:
-  forall prog tprog, transf_program prog = OK tprog -> match_prog prog tprog.
-Proof.
-  intros. eapply match_transform_partial_program_contextual; eauto.
-Qed.
 
 (** * Relating the memory states *)
 
@@ -421,7 +415,7 @@ Proof (Genv.find_funct_ptr_match TRANSF).
 
 Lemma sig_function_translated:
   forall rm f tf,
-  transf_fundef_aux transf_function rm f = OK tf ->
+  AST.transf_partial_fundef (transf_function rm) f = OK tf ->
   RTL_Incomplete.funsig tf = funsig f.
 Proof.
   intros; destruct f; monadInv H.
@@ -432,7 +426,7 @@ Qed.
 
 Lemma stacksize_translated:
   forall rm f tf,
-  transf_function rm f = OK tf -> tf.(RTL_Incomplete.fn_stacksize) = f.(fn_stacksize).
+  transf_function rm f = OK tf -> tf.(fn_stacksize) = f.(fn_stacksize).
 Proof.
   unfold transf_function; intros. destruct (analyze (ValueAnalysis.analyze rm f) f); inv H; auto.
 Qed.
@@ -445,7 +439,7 @@ Lemma transf_function_at:
   transf_function (romem_for cu) f = OK tf ->
   analyze (vanalyze cu f) f = Some an ->
   f.(fn_code)!pc = Some instr ->
-  tf.(RTL_Incomplete.fn_code)!pc = Some(transf_instr (vanalyze cu f) an pc instr).
+  tf.(fn_code)!pc = Some(transf_instr (vanalyze cu f) an pc instr).
 Proof.
   intros. unfold transf_function in H. unfold vanalyze in H0. rewrite H0 in H. inv H; simpl.
   rewrite PTree.gmap. rewrite H1; auto.
@@ -478,7 +472,7 @@ Lemma find_function_translated:
   eagree rs trs (add_ros_need_all ros ne) ->
   exists cu tfd,
      RTL_Incomplete.find_function tge ros trs = Some tfd
-  /\ transf_fundef_aux transf_function (romem_for cu) fd = OK tfd
+  /\ AST.transf_partial_fundef (transf_function (romem_for cu)) fd = OK tfd
   /\ linkorder cu prog.
 Proof.
   intros. destruct ros as [r|id]; simpl in *.
@@ -494,11 +488,9 @@ Qed.
 
 
 
-Inductive gen_match_stackframes (R : res RTL_Incomplete.function -> res RTL_Incomplete.function -> Prop) (transf_f : romem -> function -> res RTL_Incomplete.function): stackframe -> RTL_Incomplete.stackframe -> Prop :=
+Inductive gen_match_stackframes {B} (R : res (@function_ B) -> res (@function_ B) -> Prop) (transf_f : romem -> function -> res (@function_ B)): stackframe -> stackframe -> Prop :=
   | gen_match_stackframes_intro:
       forall res f sp pc e tf te cu an
-        (* (Hf_complete : is_complete f) *)
-        (* (Hcu_complete : is_complete cu) *)
         (LINK: linkorder cu prog)
         (FUN: R (transf_f (romem_for cu) f) (OK tf))
         (ANL: analyze (vanalyze cu f) f = Some an)
@@ -507,21 +499,13 @@ Inductive gen_match_stackframes (R : res RTL_Incomplete.function -> res RTL_Inco
               eagree (e#res <- v) (te#res<- tv)
                      (fst (transfer f (vanalyze cu f) pc an!!pc))),
       gen_match_stackframes R transf_f (Stackframe res f (Vptr sp Ptrofs.zero) pc e)
-                        (RTL_Incomplete.Stackframe res tf (Vptr sp Ptrofs.zero) pc te).
+                        (Stackframe res tf (Vptr sp Ptrofs.zero) pc te).
 
-Definition match_stackframes := gen_match_stackframes eq.
+Definition match_stackframes {B} := @gen_match_stackframes B eq.
 
-Lemma reflRefinableEq {A} (HRA := mkEqRefinable A) : forall a : A, a ⊑ a.
-Proof. reflexivity. Qed.
 
-Hint Resolve reflRefinableEq : core.
 
-Lemma completeTrue {A} (HRA := mkEqRefinable A) (HCA := mkCompleteTrue A) : forall a : A, is_complete a.
-Proof. compute; eauto. Qed.
-
-Hint Resolve completeTrue : core.
-
-#[local, refine] Instance monoMatchStackframes (S1 : stackframe) (S2 : RTL_Incomplete.stackframe): Monotonizable (fun transf_f => match_stackframes transf_f S1 S2) :=
+#[local, refine] Instance monoMatchStackframes S1 S2 : Monotonizable (fun transf_f => match_stackframes transf_f S1 S2) :=
 { 
   monotone := fun tf => gen_match_stackframes (fun x y => y ⊑ x) tf S1 S2 ;
   antitone := fun tf => gen_match_stackframes (fun tf1 tf2 => is_complete tf1 /\ tf1 = tf2) tf S1 S2;
@@ -550,46 +534,43 @@ Proof.
       apply HC; eauto. apply romem_complete. 
 Defined.
 
-Inductive gen_match_states 
-  (R1 : res RTL_Incomplete.function -> res RTL_Incomplete.function -> Prop) 
-  (R2 : res RTL_Incomplete.fundef -> res RTL_Incomplete.fundef -> Prop)
-  (transf_f : romem -> function -> res RTL_Incomplete.function) :
-    state -> RTL_Incomplete.state -> Prop := 
+Inductive gen_match_states {B} `{Complete (@fundef_ B)}
+  (R1 : res (@function_ B) -> res (@function_ B) -> Prop) 
+  (R2 : res (@fundef_ B) -> res (@fundef_ B) -> Prop)
+  (global_transf_f : romem -> function -> res (@function_ B)) 
+  (transf_f : romem -> function -> res (@function_ B)) :
+    state -> @state_ B -> Prop := 
 
 | gen_match_regular_states:
 forall s f sp pc e m ts tf te tm cu an
-  (* (Hf_complete : is_complete f) *)
-  (* (Hcu_complete : is_complete cu)   *)
   (STACKS: list_forall2 (gen_match_stackframes R1 transf_f) s ts)
   (LINK: linkorder cu prog)
   (FUN: R1 (transf_f (romem_for cu) f) (OK tf))
   (ANL: analyze (vanalyze cu f) f = Some an)
   (ENV: eagree e te (fst (transfer f (vanalyze cu f) pc an!!pc)))
   (MEM: magree m tm (nlive ge sp (snd (transfer f (vanalyze cu f) pc an!!pc)))),
-  gen_match_states R1 R2 transf_f (State s f (Vptr sp Ptrofs.zero) pc e m) (RTL_Incomplete.State ts tf (Vptr sp Ptrofs.zero) pc te tm)
+  gen_match_states R1 R2 global_transf_f transf_f (State s f (Vptr sp Ptrofs.zero) pc e m) (State ts tf (Vptr sp Ptrofs.zero) pc te tm)
   
 | gen_match_call_states:
   forall s f args m ts tf targs tm cu
-    (* (Hf_complete : is_complete f) *)
     (Htf_complete : is_complete tf)
-    (* (Hcu_complete : is_complete cu)   *)
     (STACKS: list_forall2 (gen_match_stackframes R1 transf_f) s ts)
     (LINK: linkorder cu prog)
-    (FUN: R2 (transf_fundef_aux transf_function (romem_for cu) f) (OK tf))
+    (FUN: R2 (AST.transf_partial_fundef (global_transf_f (romem_for cu)) f) (OK tf))
     (ARGS: Val.lessdef_list args targs)
     (MEM: Mem.extends m tm),
-  gen_match_states R1 R2 transf_f (Callstate s f args m)
-               (RTL_Incomplete.Callstate ts tf targs tm)
+  gen_match_states R1 R2 global_transf_f transf_f (Callstate s f args m)
+               (Callstate ts tf targs tm)
 
 | gen_match_return_states:
   forall s v m ts tv tm
     (STACKS: list_forall2 (gen_match_stackframes R1 transf_f) s ts)
     (RES: Val.lessdef v tv)
     (MEM: Mem.extends m tm),
-  gen_match_states R1 R2 transf_f (Returnstate s v m)
-               (RTL_Incomplete.Returnstate ts tv tm).
+  gen_match_states R1 R2 global_transf_f transf_f (Returnstate s v m)
+               (Returnstate ts tv tm).
 
-Definition transf_f_match_states := gen_match_states eq eq.
+Definition transf_f_match_states {B} `{HB : Complete (@fundef_ B)} := gen_match_states (B:=B) eq eq.
 
 
 
@@ -661,10 +642,10 @@ Proof.
   rewrite <- FUN1. apply is_complete_spec; eauto.
 Qed.
 
-#[local, refine] Instance monoMatchStates S1 S2 : Monotonizable (fun transf_f => transf_f_match_states transf_f S1 S2) :=
+#[local, refine] Instance monoMatchStates global_transf_f S1 S2 : Monotonizable (fun transf_f => transf_f_match_states global_transf_f transf_f S1 S2) :=
 { 
-  monotone := fun tf => gen_match_states (fun x y => y ⊑ x) eq tf S1 S2 ;
-  antitone := fun tf => gen_match_states (fun tf1 tf2 => is_complete tf1 /\ tf1 = tf2) eq tf S1 S2;
+  monotone := fun tf => gen_match_states (fun x y => y ⊑ x) eq global_transf_f tf S1 S2 ;
+  antitone := fun tf => gen_match_states (fun tf1 tf2 => is_complete tf1 /\ tf1 = tf2) eq global_transf_f tf S1 S2;
 }.
 Proof.
   - intros tf tf' Hprec MS; inv MS; econstructor; eauto. 
@@ -718,9 +699,8 @@ Proof.
 Qed.
 
 
-Definition match_succ_states_stm (transf_f : romem -> function -> res RTL_Incomplete.function) :=
+Definition match_succ_states_stm {B} `{Complete (@fundef_ B)} global_transf_f (transf_f : romem -> function -> res (@function_ B)) :=
   forall s f sp pc e m ts tf te tm an pc' cu instr ne nm
-    (* (Hf_complete : is_complete f) *)
     (LINK: linkorder cu prog)
     (STACKS: list_forall2 (match_stackframes transf_f) s ts)
     (FUN: transf_f (romem_for cu) f = OK tf)
@@ -731,12 +711,12 @@ Definition match_succ_states_stm (transf_f : romem -> function -> res RTL_Incomp
     (ENV: eagree e te ne)
     (MEM: magree m tm (nlive ge sp nm)),
   (* TODO : REVIEW THIS *)
-  transf_f_match_states transf_f (State s f (Vptr sp Ptrofs.zero) pc' e m)
-               (RTL_Incomplete.State ts tf (Vptr sp Ptrofs.zero) pc' te tm).
+  transf_f_match_states global_transf_f transf_f (State s f (Vptr sp Ptrofs.zero) pc' e m)
+               (State ts tf (Vptr sp Ptrofs.zero) pc' te tm).
 
 
 
-Instance : Monotonizable match_succ_states_stm.
+Instance : Monotonizable  (match_succ_states_stm transf_function).
 Proof.
   unfold match_succ_states_stm.
   repeat (unshelve eapply monotonizable_forall; intros).
@@ -744,11 +724,11 @@ Proof.
   unshelve eapply monotonizable_arrow.
   unshelve eapply monotonizable_eq_2.
   unfold is_complete. unfold_complete. split.
-  - apply sp_fun. intros; repeat split; apply H; try apply romem_sp; try apply program_sp; try apply is_complete_spec; eauto.
+  - apply sp_fun. intros; repeat split. apply H; try apply romem_sp; try apply program_sp; try apply is_complete_spec; eauto.
   - intros; apply H; try apply romem_complete; eauto.
 Defined.
 
-Lemma tolerant_match_succ_states: monotonize match_succ_states_stm transf_function.
+Lemma tolerant_match_succ_states : monotonize (match_succ_states_stm transf_function) transf_function.
 Proof.
   simpl.
   intros s f sp pc e m ts tf te tm an pc' cu instr ne nm LINK STACKS FUN ANL INSTR SUCC ANPC ENV MEM.
@@ -930,8 +910,8 @@ Qed.
 
 Definition step_simulation_stm (transf_f : romem -> function -> res RTL_Incomplete.function) :=
   forall S1 t S2, step ge S1 t S2 ->
-  forall S1', transf_f_match_states transf_f S1 S1' -> sound_state prog S1 ->
-  exists S2', RTL_Incomplete.step tge S1' t S2' /\ transf_f_match_states transf_f S2 S2'.
+  forall S1', transf_f_match_states transf_function transf_f S1 S1' -> sound_state prog S1 ->
+  exists S2', RTL_Incomplete.step tge S1' t S2' /\ transf_f_match_states transf_function transf_f S2 S2'.
 
 Lemma tolerant_step_simulation : monotonize step_simulation_stm transf_function.
 Proof. 
@@ -972,7 +952,7 @@ Ltac UseTransfer :=
     clear -TI H1.
     unfold_complete in H1. unfold_complete in H1. destruct_ctx.
     unfold_complete in H3. specialize (H3 pc). unfold_complete in H3.
-    destruct ((RTL_Incomplete.fn_code tf) ! pc); try discriminate.
+    destruct ((fn_code tf) ! pc); try discriminate.
     inversion TI; subst. inversion H3.
     
   (* Proof of complete code for this branch *)
@@ -1205,7 +1185,7 @@ Ltac UseTransfer :=
   inv H1.
   exploit magree_loadbytes. eauto. eauto.
   intros. eapply nlive_add; eauto.
-  unfold asrc, vanalyze; rewrite AN; eapply aaddr_arg_sound_1; eauto.
+  unfold asrc, vanalyze. rewrite AN; eapply aaddr_arg_sound_1; eauto.
   intros (tbytes & P & Q).
   exploit magree_storebytes_parallel.
   eapply magree_monotone. eexact D2.
@@ -1287,7 +1267,7 @@ Ltac UseTransfer :=
   
 
 + (* all other builtins *)
-  assert ((RTL_Incomplete.fn_code tf)!pc = Some(RTL_Incomplete.Ibuiltin _x _x0 res pc')).
+  assert ((fn_code tf)!pc = Some(RTL_Incomplete.Ibuiltin _x _x0 res pc')).
   {
     destruct _x; auto. destruct _x0; auto. destruct _x0; auto. destruct _x0; auto. contradiction.
   }
@@ -1630,8 +1610,8 @@ Qed.
 Theorem step_simulation:
   is_complete transf_function -> 
   forall S1 t S2, step ge S1 t S2 ->
-  forall S1', transf_f_match_states transf_function S1 S1' -> sound_state prog S1 ->
-  exists S2', RTL_Incomplete.step tge S1' t S2' /\ transf_f_match_states transf_function S2 S2'.
+  forall S1', transf_f_match_states transf_function transf_function S1 S1' -> sound_state prog S1 ->
+  exists S2', RTL_Incomplete.step tge S1' t S2' /\ transf_f_match_states transf_function transf_function S2 S2'.
 Proof.
   intros COMPLETE.
   change (step_simulation_stm transf_function).
@@ -2024,19 +2004,19 @@ Ltac UseTransfer :=
   econstructor; eauto. apply mextends_agree; auto.
 Qed.
 *)
-Definition transf_initial_states_stm (transf_f : romem -> function -> res RTL_Incomplete.function) :=
+Definition transf_initial_states_stm {B} `{Complete (@fundef_ B)} global_transf_f tprog (transf_f : romem -> function -> res (@function_ B)) :=
   forall st1, initial_state prog st1 ->
-  exists st2, RTL_Incomplete.initial_state tprog st2 /\ transf_f_match_states transf_f st1 st2.
+  exists st2, initial_state tprog st2 /\ transf_f_match_states global_transf_f transf_f st1 st2.
 
 Lemma tolerant_transf_initial_states (transf_f : romem -> function -> res RTL_Incomplete.function) :
-  monotonize transf_initial_states_stm transf_f.
+  monotonize (transf_initial_states_stm transf_function tprog) transf_f .
   (* forall st1, initial_state prog st1 ->
   exists st2, initial_state tprog st2 /\ transf_f_match_states transf_f st1 st2. *)
 Proof.
   simpl.
   intros p H. inversion H.
   exploit function_ptr_translated; eauto. intros (cu & tf & A & B & C).
-  exists (RTL_Incomplete.Callstate nil tf nil m0); split.
+  exists (Callstate nil tf nil m0); split.
   econstructor; eauto.
   eapply (Genv.init_mem_match TRANSF); eauto.
   replace (prog_main tprog) with (prog_main prog).
@@ -2053,21 +2033,21 @@ Qed.
 Lemma transf_initial_states:
   is_complete transf_function ->
   forall st1, initial_state prog st1 ->
-  exists st2, RTL_Incomplete.initial_state tprog st2 /\ transf_f_match_states transf_function st1 st2.
+  exists st2, initial_state tprog st2 /\ transf_f_match_states transf_function transf_function st1 st2.
 Proof.
   intros COMPLETE.
-  change (transf_initial_states_stm transf_function).
+  change (transf_initial_states_stm transf_function tprog transf_function).
   rewrite <- complete_monotone_is_equivalent; eauto.
   apply tolerant_transf_initial_states.
 Qed.
   
 
-Definition transf_final_states_stm (transf_f : romem -> function -> res RTL_Incomplete.function) := 
+Definition transf_final_states_stm {B} `{Complete (@fundef_ B)} global_transf_f (transf_f : romem -> function -> res (@function_ B)) := 
   forall st1 st2 r,
-  transf_f_match_states transf_f st1 st2 -> final_state st1 r -> RTL_Incomplete.final_state st2 r.
+  transf_f_match_states global_transf_f transf_f st1 st2 -> final_state st1 r -> final_state st2 r.
 
 Lemma tolerant_transf_final_states (transf_f : romem -> function -> res RTL_Incomplete.function):
-  monotonize transf_final_states_stm transf_f.
+  monotonize (transf_final_states_stm transf_function) transf_f.
   (* forall st1 st2 r,
   transf_f_match_states transf_f st1 st2 -> final_state st1 r -> final_state st2 r. *)
 Proof.
@@ -2078,10 +2058,10 @@ Qed.
 Lemma transf_final_states:
   is_complete transf_function ->
   forall st1 st2 r,
-  transf_f_match_states transf_function st1 st2 -> final_state st1 r -> RTL_Incomplete.final_state st2 r.
+  transf_f_match_states transf_function transf_function st1 st2 -> final_state st1 r -> final_state st2 r.
 Proof.
   intros COMPLETE.
-  change (transf_final_states_stm transf_function).
+  change (transf_final_states_stm transf_function transf_function).
   rewrite <- complete_monotone_is_equivalent; eauto.
   apply tolerant_transf_final_states.
 Qed.
@@ -2101,7 +2081,7 @@ Proof.
   fold ge; fold tge. exploit step_simulation; eauto. intros [st2' [A B]].
   exists st2'; auto.
 Qed.
-
+*)
 End PRESERVATION.
 
 (** * Semantic preservation *)
@@ -2110,7 +2090,7 @@ Axiom (is_complete_transf_function : is_complete transf_function).
 Hint Resolve is_complete_transf_function : core.
 
 Program Definition to_RTL_function (f : RTL_Incomplete.function) (Hfcomplete : is_complete f): RTL.function :=
-  (mkfunction (RTL_Incomplete.fn_sig f) (RTL_Incomplete.fn_params f) (RTL_Incomplete.fn_stacksize f) _ (RTL_Incomplete.fn_entrypoint f)).
+  (mkfunction (fn_sig f) (fn_params f) (fn_stacksize f) _ (fn_entrypoint f)).
 Next Obligation.
   unfold_complete in Hfcomplete. destruct_ctx. 
   destruct f. cbn in *.
@@ -2150,33 +2130,75 @@ Definition match_prog (prog : program) (tprog: program) :=
   match_prog_aux transf_function_complete prog tprog.
 
 Section TRANSF_PROGRAM_CORRECT.
-Variable prog: program.
-Variable tprog: program.
-(* FIXME: To make match_prog_aux monotonizable *)
-Hypothesis TRANSF: match_prog prog tprog.
-(* To make math_prog antitone *)
-(* Lemma COMPLETE_TPROG : is_complete tprog.
-Proof.
-  (* unfold_complete. unfold match_prog_aux in TRANSF. unfold_complete in COMPLETE_PROG. destruct COMPLETE_PROG. split. 
-  - intros. specialize (H ros rs). destruct ros; simpl in *.  *)
-Admitted. *)
+  Variable prog: program.
+  Variable tprog: program.
+  Hypothesis TRANSF: match_prog prog tprog.
+  Let ge := Genv.globalenv prog.
+  Let tge := Genv.globalenv tprog.
 
-Theorem transf_program_correct:
-  forward_simulation (RTL.semantics prog) (RTL.semantics tprog).
-Proof.
-  intros.
-  apply forward_simulation_step with
-     (match_states := fun s1 s2 => sound_state prog s1 /\ transf_f_match_states prog transf_function_com s1 s2).
-- apply senv_preserved. eauto.
-- simpl; intros. exploit transf_initial_states. 3: exact TRANSF. 1-4: eauto. apply COMPLETE_TPROG. intros [st2 [A B]].
-  exists st2; intuition. eapply sound_initial; eauto.
-- simpl; intros. destruct H. eapply transf_final_states; eauto.
-- simpl; intros. destruct H0.
-  assert (sound_state prog s1') by (eapply sound_step; eauto).
-  (* fold ge; fold tge.  *)
-  exploit step_simulation. 3: exact TRANSF. all: eauto. apply COMPLETE_TPROG. intros [st2' [A B]].
-  exists st2'; auto.
-Qed.
+  Definition map_function_ {A B} (f : A -> B) (fn : @function_ A) : @function_ B :=
+    (mkfunction (fn_sig fn) (fn_params fn) (fn_stacksize fn) (PTree.map (fun _ => f ) (fn_code fn)) (fn_entrypoint fn)).
+    
+  Lemma incomplete_program : 
+    exists tprog', match_prog_aux transf_function prog tprog' /\ is_complete tprog'.
+  Proof.
+    exists (transform_program (AST.transf_fundef (map_function_ to_RTL_Incomplete_instruction)) tprog).
+  Admitted.
+
+  Definition map_stackframe {A B} (f : A -> B) (sf : @stackframe A) : @stackframe B :=
+    match sf with
+    | Stackframe rs fn v n r => Stackframe rs (map_function_ f fn) v n r
+    end.
+
+  Definition map_state {A B} (f : A -> B) (s : @state_ A) : @state_ B :=
+    match s with 
+    | State stack fn v n r m => State (List.map (map_stackframe f) stack) (map_function_ f fn) v n r m
+    | Callstate stack fn vl m => Callstate (List.map (map_stackframe f) stack) (AST.transf_fundef (map_function_ f) fn) vl m
+    | Returnstate stack v m => Returnstate (List.map (map_stackframe f) stack) v m
+    end.
+
+  Lemma senv_preserved':
+    Senv.equiv ge tge.
+  Proof (Genv.senv_match TRANSF).
+
+  Lemma state_incomplete_inversion : forall s1 st2,
+    transf_f_match_states prog transf_function transf_function s1 st2 -> 
+    exists s2', map_state to_RTL_Incomplete_instruction s2' = st2. 
+  Admitted.
+
+  Theorem transf_program_correct:
+    forward_simulation (RTL.semantics prog) (RTL.semantics tprog).
+  Proof.
+    intros.
+    destruct incomplete_program as [tprog' [Hm' Hcomplete]].
+    apply forward_simulation_step with
+      (match_states := fun s1 s2 => sound_state prog s1 /\ transf_f_match_states prog transf_function transf_function s1 (map_state (to_RTL_Incomplete_instruction) s2)).
+  - apply senv_preserved'. 
+  - simpl; intros.   exploit transf_initial_states. 2: exact Hm'.
+    eauto. eauto. eauto.  intros [st2 [A B]]. pose proof (B':=B). eapply state_incomplete_inversion in B as [s2' Heq].
+    exists s2'. rewrite Heq. split.  admit. split. eapply sound_initial; eauto. eauto. 
+    (* exists (st2); intuition. eapply sound_initial; eauto. *)
+  - simpl; intros. destruct H. eapply transf_final_states in H0; eauto. 
+    destruct s2; cbn in H0; inversion H0. symmetry in H3. apply map_eq_nil in H3. now subst.
+  - simpl; intros. destruct H0.
+    assert (sound_state prog s1') by (eapply sound_step; eauto).
+    fold ge; fold tge. 
+    exploit step_simulation. 5: exact H1. all: eauto. intros [st2' [A B]].
+    pose proof (B':=B). eapply state_incomplete_inversion in B as [s2' Heq].
+    exists s2'. rewrite Heq. split. rewrite <- Heq in A.  admit. split. eauto. eauto. 
+
+  Admitted.
+
 
 End TRANSF_PROGRAM_CORRECT.
+Definition transf_program_aux (p: program) transf_f: res program :=
+  transform_partial_program (AST.transf_partial_fundef (transf_f (romem_for p))) p.
 
+Definition transf_program (p: program) : res program :=
+  transf_program_aux p transf_function_complete.
+
+Lemma transf_program_match:
+  forall prog tprog, transf_program prog = OK tprog -> match_prog prog tprog.
+Proof.
+  intros. eapply match_transform_partial_program_contextual; eauto.
+Qed.

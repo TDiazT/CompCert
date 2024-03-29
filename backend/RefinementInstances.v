@@ -37,6 +37,7 @@ Definition mkEqRefinable (A : Type) : Refinable A :=
   is_right_reflexive := ltac:(simpl; eauto) ;
   |}.
 
+  
 (* Makes complete instances where the complete predicate is always true. 
   The premise is just to reuse the definition for other types with eq refinement.
 *)
@@ -51,6 +52,16 @@ Program Definition mkGroundTrue (A : Type) (refEqA := mkEqRefinable A) (compA :=
   {|
     is_complete_minimal := _
   |}.
+
+Lemma reflRefinableEq {A} (HRA := mkEqRefinable A) : forall a : A, a ⊑ a.
+Proof. reflexivity. Qed.
+
+Hint Resolve reflRefinableEq : core.
+
+Lemma completeTrue {A} (HRA := mkEqRefinable A) (HCA := mkCompleteTrue A) : forall a : A, is_complete a.
+Proof. compute; eauto. Qed.
+  
+Hint Resolve completeTrue : core.
 
 #[export, refine] Instance refinableRes {A} `{Refinable A} : Refinable (res A) := 
 {

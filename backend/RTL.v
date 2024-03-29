@@ -163,7 +163,7 @@ Inductive stackframe : Type :=
              (rs: regset),         (**r register state in calling function *)
       stackframe.
 
-Inductive state : Type :=
+Inductive state_ : Type :=
   | State:
       forall (stack: list stackframe) (**r call stack *)
              (f: function_)            (**r current function *)
@@ -171,20 +171,20 @@ Inductive state : Type :=
              (pc: node)               (**r current program point in [c] *)
              (rs: regset)             (**r register state *)
              (m: mem),                (**r memory state *)
-      state
+      state_
   | Callstate:
       forall (stack: list stackframe) (**r call stack *)
              (f: fundef_)              (**r function to call *)
              (args: list val)         (**r arguments to the call *)
              (m: mem),                (**r memory state *)
-      state
+      state_
   | Returnstate:
       forall (stack: list stackframe) (**r call stack *)
              (v: val)                 (**r return value for the call *)
              (m: mem),                (**r memory state *)
-      state.
+      state_.
 
-Definition find_function (ge : genv_)
+Definition find_function_ (ge : genv_)
       (ros: reg + ident) (rs: regset) : option fundef_ :=
   match ros with
   | inl r => Genv.find_funct ge rs#r
@@ -200,7 +200,7 @@ Definition find_function (ge : genv_)
   corresponding to the invocation of the ``main'' function of the program
   without arguments and with an empty call stack. *)
 
-Inductive initial_state (p: program_): state -> Prop :=
+Inductive initial_state (p: program_): state_ -> Prop :=
 | initial_state_intro: forall b f m0,
     let ge := Genv.globalenv p in
     Genv.init_mem p = Some m0 ->
@@ -211,7 +211,7 @@ Inductive initial_state (p: program_): state -> Prop :=
 
 (** A final state is a [Returnstate] with an empty call stack. *)
 
-Inductive final_state: state -> int -> Prop :=
+Inductive final_state: state_ -> int -> Prop :=
 | final_state_intro: forall r m,
     final_state (Returnstate nil (Vint r) m) r.
 
@@ -240,13 +240,14 @@ Inductive final_state: state -> int -> Prop :=
 
 End Program.
 
-Definition code := @code_ instruction.
-Definition function := @function_ instruction.
-Definition fundef := @fundef_ instruction.
-Definition program := @program_ instruction.
-Definition funsig := @funsig_ instruction.
-Definition genv := @genv_ instruction.
-
+Notation code := (@code_ instruction).
+Notation function := (@function_ instruction).
+Notation fundef := (@fundef_ instruction).
+Notation program := (@program_ instruction).
+Notation funsig := (@funsig_ instruction).
+Notation genv := (@genv_ instruction).
+Notation find_function := (@find_function_ instruction).
+Notation state := (@state_ instruction).
 
 Section RELSEM.
 Variable ge: genv.

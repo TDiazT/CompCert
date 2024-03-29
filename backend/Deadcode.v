@@ -162,19 +162,19 @@ Definition analyze (approx: PMap.t VA.t) (f: function): option (PMap.t NA.t) :=
 Definition transf_instr (approx: PMap.t VA.t) (an: PMap.t NA.t)
                         (pc: node) (instr: instruction) : RTL_Incomplete.instruction :=
   match instr with
-  | Iop op args res s =>
-      let nres := nreg (fst an!!pc) res in
+  | Iop op args res s => Inotimplemented
+      (* let nres := nreg (fst an!!pc) res in
       if is_dead nres then
-        Inop s
+        RTL_Incomplete.Inop s
       else if is_int_zero nres then
-        Iop (Ointconst Int.zero) nil res s
+        RTL_Incomplete.Iop (Ointconst Int.zero) nil res s
       else if operation_is_redundant op nres then
         match args with
-        | arg :: _ => Iop Omove (arg :: nil) res s
+        | arg :: _ => RTL_Incomplete.Iop Omove (arg :: nil) res s
         | nil => instr
         end
       else
-        instr
+        instr *)
   | Iload chunk addr args dst s =>
       let ndst := nreg (fst an!!pc) dst in
       if is_dead ndst then
@@ -202,25 +202,26 @@ Definition transf_function (rm: romem) (f: function) : res RTL_Incomplete.functi
   let approx := ValueAnalysis.analyze rm f in
   match analyze approx f with
   | Some an =>
-      OK {| RTL_Incomplete.fn_sig := f.(fn_sig);
-            RTL_Incomplete.fn_params := f.(fn_params);
-            RTL_Incomplete.fn_stacksize := f.(fn_stacksize);
-            RTL_Incomplete.fn_code := PTree.map (transf_instr approx an) f.(fn_code);
-            RTL_Incomplete.fn_entrypoint := f.(fn_entrypoint) |}
+      OK {| fn_sig := f.(fn_sig);
+            fn_params := f.(fn_params);
+            fn_stacksize := f.(fn_stacksize);
+            fn_code := PTree.map (transf_instr approx an) f.(fn_code);
+            fn_entrypoint := f.(fn_entrypoint) |}
   | None =>
       Error (msg "Neededness analysis failed")
   end.
 
 
-Definition transf_fundef_aux {A} (transf_f : romem -> function -> res A) (rm: romem) (fd: fundef) : res (AST.fundef A) :=
-  AST.transf_partial_fundef (transf_f rm) fd.
+(* Definition transf_fundef_aux {A B} (transf_f : A -> res B) (fd: fundef) : res (AST.fundef A) :=
+  AST.transf_partial_fundef transf_f fd. *)
 
-(* Definition transf_fundef (rm: romem) (fd: fundef) : res fundef := *)
-  (* transf_fundef_aux rm fd transf_function. *)
 
-  (* TODO : Maybe parameterize by transf_f *)
+Definition transf_fundef (rm: romem) (fd: fundef) : res RTL_Incomplete.fundef :=
+  AST.transf_partial_fundef (transf_function rm) fd.
+
+  
 Definition transf_program_aux (p: program) transf_f: res RTL_Incomplete.program :=
-  transform_partial_program (transf_fundef_aux transf_f (romem_for p) ) p.
+  transform_partial_program (AST.transf_partial_fundef (transf_f (romem_for p))) p.
 
 Definition transf_program (p: program) : res RTL_Incomplete.program :=
   transf_program_aux p transf_function.
