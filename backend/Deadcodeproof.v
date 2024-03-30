@@ -728,7 +728,7 @@ Proof.
   - intros; apply H; try apply romem_complete; eauto.
 Defined.
 
-Lemma tolerant_match_succ_states : monotonize (match_succ_states_stm transf_function) transf_function.
+Lemma match_succ_states : monotonize (match_succ_states_stm transf_function) transf_function.
 Proof.
   simpl.
   intros s f sp pc e m ts tf te tm an pc' cu instr ne nm LINK STACKS FUN ANL INSTR SUCC ANPC ENV MEM.
@@ -943,7 +943,7 @@ Ltac UseTransfer :=
   TransfInstr; UseTransfer.
   econstructor; split.
   eapply RTL_Incomplete.exec_Inop; eauto.
-  eapply tolerant_match_succ_states; eauto; simpl; auto.
+  eapply match_succ_states; eauto; simpl; auto.
   
   - (* op *) 
     destruct FUN as [? FUN].
@@ -1013,13 +1013,13 @@ Ltac UseTransfer :=
 + (* dead instruction, turned into a nop *)
   econstructor; split.
   eapply RTL_Incomplete.exec_Inop; eauto.
-  eapply tolerant_match_succ_states; eauto; simpl; auto. 
+  eapply match_succ_states; eauto; simpl; auto. 
   apply eagree_update_dead; auto with na.
   Unshelve. all: eauto.
 + (* instruction with needs = [I Int.zero], turned into a load immediate of zero. *)
   econstructor; split.
   eapply RTL_Incomplete.exec_Iop with (v := Vint Int.zero); eauto.
-  eapply tolerant_match_succ_states; eauto; simpl; auto.
+  eapply match_succ_states; eauto; simpl; auto.
   apply eagree_update; auto.
   rewrite is_int_zero_sound by auto.
   destruct v; simpl; auto. apply iagree_zero.
@@ -1036,7 +1036,7 @@ Ltac UseTransfer :=
   eapply RTL_Incomplete.exec_Iload with (a := Vptr b i). eauto.
   rewrite <- U. apply eval_addressing_preserved. exact symbols_preserved.
   eauto.
-  eapply tolerant_match_succ_states; eauto; simpl; auto.
+  eapply match_succ_states; eauto; simpl; auto.
   apply eagree_update; eauto 2 with na.
   eapply magree_monotone; eauto. intros. apply incl_nmem_add; auto.
 
@@ -1059,14 +1059,14 @@ Ltac UseTransfer :=
   eapply RTL_Incomplete.exec_Istore with (a := Vptr b i). eauto.
   rewrite <- U. apply eval_addressing_preserved. exact symbols_preserved.
   eauto.
-  eapply tolerant_match_succ_states; eauto; simpl; auto.
+  eapply match_succ_states; eauto; simpl; auto.
   eauto 3 with na.
 
 + (* dead instruction, turned into a nop *)
   destruct a; simpl in H1; try discriminate.
   econstructor; split.
   eapply RTL_Incomplete.exec_Inop; eauto.
-  eapply tolerant_match_succ_states; eauto; simpl; auto.
+  eapply match_succ_states; eauto; simpl; auto.
   eapply magree_store_left; eauto.
   exploit aaddressing_sound; eauto. intros (bc & A & B & C).
   intros. eapply nlive_contains; eauto.
@@ -1140,7 +1140,7 @@ Ltac UseTransfer :=
   constructor. eauto. constructor.
   eapply external_call_symbols_preserved. apply senv_preserved.
   constructor. simpl. eauto.
-  eapply tolerant_match_succ_states; eauto; simpl; auto.
+  eapply match_succ_states; eauto; simpl; auto.
   apply eagree_set_res; auto.
   eapply magree_monotone; eauto. intros. apply incl_nmem_add; auto.
   
@@ -1163,7 +1163,7 @@ Ltac UseTransfer :=
   constructor. eauto. constructor. eauto. constructor.
   eapply external_call_symbols_preserved. apply senv_preserved.
   simpl; eauto.
-  eapply tolerant_match_succ_states; eauto; simpl; auto.
+  eapply match_succ_states; eauto; simpl; auto.
   apply eagree_set_res; auto.
   
 
@@ -1205,7 +1205,7 @@ Ltac UseTransfer :=
   constructor. eauto. constructor. eauto. constructor.
   eapply external_call_symbols_preserved. apply senv_preserved.
   simpl in B1; inv B1. simpl in B2; inv B2. econstructor; eauto.
-  eapply tolerant_match_succ_states; eauto; simpl; auto.
+  eapply match_succ_states; eauto; simpl; auto.
   apply eagree_set_res; auto.
   
 
@@ -1217,7 +1217,7 @@ Ltac UseTransfer :=
   inv H1.
   econstructor; split.
   eapply RTL_Incomplete.exec_Inop; eauto.
-  eapply tolerant_match_succ_states; eauto; simpl; auto.
+  eapply match_succ_states; eauto; simpl; auto.
   destruct res; auto. apply eagree_set_undef; auto.
   eapply magree_storebytes_left; eauto.
   clear H3.
@@ -1238,7 +1238,7 @@ Ltac UseTransfer :=
   apply eval_builtin_args_preserved with (ge1 := ge); eauto. exact symbols_preserved.
   eapply external_call_symbols_preserved. apply senv_preserved.
   constructor. eapply eventval_list_match_lessdef; eauto 2 with na.
-  eapply tolerant_match_succ_states; eauto; simpl; auto.
+  eapply match_succ_states; eauto; simpl; auto.
   apply eagree_set_res; auto.
   
 
@@ -1253,7 +1253,7 @@ Ltac UseTransfer :=
   eapply external_call_symbols_preserved. apply senv_preserved.
   constructor.
   eapply eventval_match_lessdef; eauto 2 with na.
-  eapply tolerant_match_succ_states; eauto; simpl; auto.
+  eapply match_succ_states; eauto; simpl; auto.
   apply eagree_set_res; auto.
   
 
@@ -1262,7 +1262,7 @@ Ltac UseTransfer :=
   exploit can_eval_builtin_args; eauto. intros (vargs' & A).
   econstructor; split.
   eapply RTL_Incomplete.exec_Ibuiltin; eauto. constructor.
-  eapply tolerant_match_succ_states; eauto; simpl; auto.
+  eapply match_succ_states; eauto; simpl; auto.
   apply eagree_set_res; auto.
   
 
@@ -1282,7 +1282,7 @@ Ltac UseTransfer :=
   eapply RTL_Incomplete.exec_Ibuiltin; eauto.
   apply eval_builtin_args_preserved with (ge1 := ge); eauto. exact symbols_preserved.
   eapply external_call_symbols_preserved. apply senv_preserved. eauto.
-  eapply tolerant_match_succ_states; eauto; simpl; auto.
+  eapply match_succ_states; eauto; simpl; auto.
   apply eagree_set_res; auto.
   eapply mextends_agree; eauto.
   
@@ -1293,11 +1293,11 @@ Ltac UseTransfer :=
 + replace (if b then ifso else ifnot) with ifso by (destruct b; congruence).
   econstructor; split.
   eapply RTL_Incomplete.exec_Inop; eauto.
-  eapply tolerant_match_succ_states; eauto; simpl; auto.
+  eapply match_succ_states; eauto; simpl; auto.
 + econstructor; split.
   eapply RTL_Incomplete.exec_Icond; eauto.
   eapply needs_of_condition_sound. eapply ma_perm; eauto. eauto. eauto with na.
-  eapply tolerant_match_succ_states; eauto 2 with na. (* new *) simpl; eauto.
+  eapply match_succ_states; eauto 2 with na. (* new *) simpl; eauto.
   simpl; destruct b; auto.
 
 - (* jumptable *)
@@ -1307,7 +1307,7 @@ Ltac UseTransfer :=
   rewrite H0 in LD. inv LD.
   econstructor; split.
   eapply RTL_Incomplete.exec_Ijumptable; eauto.
-  eapply tolerant_match_succ_states; eauto 2 with na. (* new *) simpl; eauto.
+  eapply match_succ_states; eauto 2 with na. (* new *) simpl; eauto.
   simpl. eapply list_nth_z_in; eauto.
   Unshelve. all: eauto.
 
