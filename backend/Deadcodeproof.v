@@ -570,7 +570,7 @@ forall s f sp pc e m ts tf te tm cu an
   gen_match_states R1 R2 global_transf_f transf_f (Returnstate s v m)
                (Returnstate ts tv tm).
 
-Definition transf_f_match_states {B} `{HB : Complete (@fundef_ B)} := gen_match_states (B:=B) eq eq.
+Definition match_states {B} `{HB : Complete (@fundef_ B)} := gen_match_states (B:=B) eq eq.
 
 
 
@@ -642,7 +642,7 @@ Proof.
   rewrite <- FUN1. apply is_complete_spec; eauto.
 Qed.
 
-#[local, refine] Instance monoMatchStates global_transf_f S1 S2 : Monotonizable (fun transf_f => transf_f_match_states global_transf_f transf_f S1 S2) :=
+#[local, refine] Instance monoMatchStates global_transf_f S1 S2 : Monotonizable (fun transf_f => match_states global_transf_f transf_f S1 S2) :=
 { 
   monotone := fun tf => gen_match_states (fun x y => y ⊑ x) eq global_transf_f tf S1 S2 ;
   antitone := fun tf => gen_match_states (fun tf1 tf2 => is_complete tf1 /\ tf1 = tf2) eq global_transf_f tf S1 S2;
@@ -711,7 +711,7 @@ Definition match_succ_states_stm {B} `{Complete (@fundef_ B)} global_transf_f (t
     (ENV: eagree e te ne)
     (MEM: magree m tm (nlive ge sp nm)),
   (* TODO : REVIEW THIS *)
-  transf_f_match_states global_transf_f transf_f (State s f (Vptr sp Ptrofs.zero) pc' e m)
+  match_states global_transf_f transf_f (State s f (Vptr sp Ptrofs.zero) pc' e m)
                (State ts tf (Vptr sp Ptrofs.zero) pc' te tm).
 
 
@@ -910,8 +910,8 @@ Qed.
 
 Definition step_simulation_stm (transf_f : romem -> function -> res RTL_Incomplete.function) :=
   forall S1 t S2, step ge S1 t S2 ->
-  forall S1', transf_f_match_states transf_function transf_f S1 S1' -> sound_state prog S1 ->
-  exists S2', RTL_Incomplete.step tge S1' t S2' /\ transf_f_match_states transf_function transf_f S2 S2'.
+  forall S1', match_states transf_function transf_f S1 S1' -> sound_state prog S1 ->
+  exists S2', RTL_Incomplete.step tge S1' t S2' /\ match_states transf_function transf_f S2 S2'.
 
 Lemma tolerant_step_simulation : monotonize step_simulation_stm transf_function.
 Proof. 
@@ -1610,8 +1610,8 @@ Qed.
 Theorem step_simulation:
   is_complete transf_function -> 
   forall S1 t S2, step ge S1 t S2 ->
-  forall S1', transf_f_match_states transf_function transf_function S1 S1' -> sound_state prog S1 ->
-  exists S2', RTL_Incomplete.step tge S1' t S2' /\ transf_f_match_states transf_function transf_function S2 S2'.
+  forall S1', match_states transf_function transf_function S1 S1' -> sound_state prog S1 ->
+  exists S2', RTL_Incomplete.step tge S1' t S2' /\ match_states transf_function transf_function S2 S2'.
 Proof.
   intros COMPLETE.
   change (step_simulation_stm transf_function).
@@ -2006,12 +2006,12 @@ Qed.
 *)
 Definition transf_initial_states_stm {B} `{Complete (@fundef_ B)} global_transf_f tprog (transf_f : romem -> function -> res (@function_ B)) :=
   forall st1, initial_state prog st1 ->
-  exists st2, initial_state tprog st2 /\ transf_f_match_states global_transf_f transf_f st1 st2.
+  exists st2, initial_state tprog st2 /\ match_states global_transf_f transf_f st1 st2.
 
 Lemma tolerant_transf_initial_states (transf_f : romem -> function -> res RTL_Incomplete.function) :
   monotonize (transf_initial_states_stm transf_function tprog) transf_f .
   (* forall st1, initial_state prog st1 ->
-  exists st2, initial_state tprog st2 /\ transf_f_match_states transf_f st1 st2. *)
+  exists st2, initial_state tprog st2 /\ match_states transf_f st1 st2. *)
 Proof.
   simpl.
   intros p H. inversion H.
@@ -2033,7 +2033,7 @@ Qed.
 Lemma transf_initial_states:
   is_complete transf_function ->
   forall st1, initial_state prog st1 ->
-  exists st2, initial_state tprog st2 /\ transf_f_match_states transf_function transf_function st1 st2.
+  exists st2, initial_state tprog st2 /\ match_states transf_function transf_function st1 st2.
 Proof.
   intros COMPLETE.
   change (transf_initial_states_stm transf_function tprog transf_function).
@@ -2044,12 +2044,12 @@ Qed.
 
 Definition transf_final_states_stm {B} `{Complete (@fundef_ B)} global_transf_f (transf_f : romem -> function -> res (@function_ B)) := 
   forall st1 st2 r,
-  transf_f_match_states global_transf_f transf_f st1 st2 -> final_state st1 r -> final_state st2 r.
+  match_states global_transf_f transf_f st1 st2 -> final_state st1 r -> final_state st2 r.
 
 Lemma tolerant_transf_final_states (transf_f : romem -> function -> res RTL_Incomplete.function):
   monotonize (transf_final_states_stm transf_function) transf_f.
   (* forall st1 st2 r,
-  transf_f_match_states transf_f st1 st2 -> final_state st1 r -> final_state st2 r. *)
+  match_states transf_f st1 st2 -> final_state st1 r -> final_state st2 r. *)
 Proof.
   simpl.
   intros. inv H0. inv H. inv STACKS. inv RES. constructor.
@@ -2058,7 +2058,7 @@ Qed.
 Lemma transf_final_states:
   is_complete transf_function ->
   forall st1 st2 r,
-  transf_f_match_states transf_function transf_function st1 st2 -> final_state st1 r -> final_state st2 r.
+  match_states transf_function transf_function st1 st2 -> final_state st1 r -> final_state st2 r.
 Proof.
   intros COMPLETE.
   change (transf_final_states_stm transf_function transf_function).
@@ -2071,7 +2071,7 @@ Qed.
 Proof.
   intros.
   apply forward_simulation_step with
-     (match_states := fun s1 s2 => sound_state prog s1 /\ transf_f_match_states transf_function s1 s2).
+     (match_states := fun s1 s2 => sound_state prog s1 /\ match_states transf_function s1 s2).
 - apply senv_preserved.
 - simpl; intros. exploit transf_initial_states. eauto. admit. intros [st2 [A B]].
   exists st2; intuition. eapply sound_initial; eauto.
@@ -2162,7 +2162,7 @@ Section TRANSF_PROGRAM_CORRECT.
   Proof (Genv.senv_match TRANSF).
 
   Lemma state_incomplete_inversion : forall s1 st2,
-    transf_f_match_states prog transf_function transf_function s1 st2 -> 
+    match_states prog transf_function transf_function s1 st2 -> 
     exists s2', map_state to_RTL_Incomplete_instruction s2' = st2. 
   Admitted.
 
@@ -2172,7 +2172,7 @@ Section TRANSF_PROGRAM_CORRECT.
     intros.
     destruct incomplete_program as [tprog' [Hm' Hcomplete]].
     apply forward_simulation_step with
-      (match_states := fun s1 s2 => sound_state prog s1 /\ transf_f_match_states prog transf_function transf_function s1 (map_state (to_RTL_Incomplete_instruction) s2)).
+      (match_states := fun s1 s2 => sound_state prog s1 /\ match_states prog transf_function transf_function s1 (map_state (to_RTL_Incomplete_instruction) s2)).
   - apply senv_preserved'. 
   - simpl; intros.   exploit transf_initial_states. 2: exact Hm'.
     eauto. eauto. eauto.  intros [st2 [A B]]. pose proof (B':=B). eapply state_incomplete_inversion in B as [s2' Heq].
