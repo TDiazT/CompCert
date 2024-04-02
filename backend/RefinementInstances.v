@@ -1,3 +1,4 @@
+Require Import Coq.Relations.Relation_Definitions.
 Require Export Refinement.
 Require Import FunInd.
 Require Import Coqlib Maps Errors Integers Floats Lattice Kildall.
@@ -32,7 +33,7 @@ Ltac destruct_ctx :=
 (* Makes refinable instances where the refinement relation is equality. *)
 Definition mkEqRefinable (A : Type) : Refinable A :=
  {|
-  is_refinement (x y : A) := x = y ;
+  refinement (x y : A) := x = y ;
   is_transitive := ltac:(unfold Relation_Definitions.transitive; try induction x; eauto; intros; subst; eauto);
   is_right_reflexive := ltac:(simpl; eauto) ;
   |}.
@@ -48,7 +49,7 @@ Program Definition mkCompleteTrue (A : Type) (refEqA := mkEqRefinable A) : Compl
   |}.
 Next Obligation. reflexivity. Qed.
 
-Program Definition mkGroundTrue (A : Type) (refEqA := mkEqRefinable A) (compA := mkCompleteTrue A) : Ground A :=
+Program Instance mkGroundTrue (A : Type) (refEqA := mkEqRefinable A) (compA := mkCompleteTrue A) : Ground A :=
   {|
     is_complete_minimal := _
   |}.
@@ -65,7 +66,7 @@ Hint Resolve completeTrue : core.
 
 #[export, refine] Instance refinableRes {A} `{Refinable A} : Refinable (res A) := 
 {
-  is_refinement r1 r2 := match r1, r2 with 
+  refinement r1 r2 := match r1, r2 with 
   | OK x1, OK x2 => x1 ⊑ x2
   (* Just to get ground *)
   | Error e1, Error e2 => e1 = e2
@@ -87,18 +88,18 @@ Defined.
     end
   }.
 Proof.
-  intros []; eauto; intros; simpl; eauto; unfold is_refinement; cbn; try apply is_complete_spec; eauto.
+  intros []; eauto; intros; simpl; eauto; unfold refinement; cbn; try apply is_complete_spec; eauto.
 Defined.
 
 #[export] Instance groundRes {A} `{Ground A} : Ground (res A).
 Proof. constructor; intros [] ? []; simpl; try contradiction; intros.
       - f_equal. eapply is_complete_minimal; eauto.
-      - unfold is_refinement in H4; cbn in H4; subst; eauto.
+      - unfold refinement in H4; cbn in H4; subst; eauto.
 Defined. 
 
 #[export, refine] Instance refinableOption {A} `{Refinable A} : Refinable (option A) := 
 {
-  is_refinement o1 o2 := match o1, o2 with 
+  refinement o1 o2 := match o1, o2 with 
   | Some x1, Some x2 => x1 ⊑ x2
   | None, None => True
   | _, _ => False
@@ -118,7 +119,7 @@ Defined.
     end
   }.
 Proof.
-  intros []; eauto; intros; simpl; eauto. unfold is_refinement; cbn; apply is_complete_spec; eauto.
+  intros []; eauto; intros; simpl; eauto. unfold refinement; cbn; apply is_complete_spec; eauto.
 Defined.
 
 #[export] Instance groundOption {A} `{Ground A} : Ground (option A).
@@ -128,7 +129,7 @@ Defined.
 
 #[export, refine] Instance refinableList {A} `{Refinable A} : Refinable (list A) := 
 {
-  is_refinement l1 l2 := let fix aux l1 l2 :=
+  refinement l1 l2 := let fix aux l1 l2 :=
    match l1, l2 with
     | nil, nil => True
     | x :: xs, y :: ys => x ⊑ y /\ aux xs ys
@@ -164,7 +165,7 @@ Defined.
   
 #[export, refine] Instance refinableSum {A B} `{Refinable A} `{Refinable B} : Refinable (A + B) := 
 {
-  is_refinement s1 s2 := match s1, s2 with 
+  refinement s1 s2 := match s1, s2 with 
   | inl x1, inl x2 => x1 ⊑ x2
   | inr y1, inr y2 => y1 ⊑ y2
   | _, _ => False
@@ -192,7 +193,7 @@ Defined.
 
 #[export, refine] Instance refinableProd {A B} `{Refinable A} `{Refinable B} : Refinable (A * B) := 
 {
-  is_refinement p1 p2 := let (x1, y1) := p1 in let (x2, y2) := p2 in x1 ⊑ x2 /\ y1 ⊑ y2
+  refinement p1 p2 := let (x1, y1) := p1 in let (x2, y2) := p2 in x1 ⊑ x2 /\ y1 ⊑ y2
 }.
 Proof.
   - unfold Relation_Definitions.transitive; intros [] [] [] [] []; split; try eapply is_transitive; eauto.
@@ -229,7 +230,6 @@ Defined.
 (* node and reg are positive *)
 #[export] Instance : Refinable reg := mkEqRefinable reg.
 #[export] Instance : Complete reg := mkCompleteTrue reg. 
-#[export] Instance : Ground reg := mkGroundTrue reg.
 
 #[export] Instance : Refinable operation := mkEqRefinable operation.
 #[export] Instance : Complete operation := mkCompleteTrue operation.
@@ -243,12 +243,10 @@ Defined.
 (* Signature is actually a record *)
 #[export] Instance : Refinable signature := mkEqRefinable signature.
 #[export] Instance : Complete signature := mkCompleteTrue signature.
-#[export] Instance : Ground signature := mkGroundTrue signature.
 
 (* external_function is an inductive *)
 #[export] Instance : Refinable external_function := mkEqRefinable external_function.
 #[export] Instance : Complete external_function := mkCompleteTrue external_function.
-#[export] Instance : Ground external_function := mkGroundTrue external_function.
 
 #[export] Instance : Refinable condition := mkEqRefinable condition.
 #[export] Instance : Complete condition := mkCompleteTrue condition.
@@ -265,7 +263,6 @@ Defined.
 
 #[export] Instance : Refinable Z := mkEqRefinable Z.
 #[export] Instance : Complete Z := mkCompleteTrue Z . 
-#[export] Instance : Ground Z := mkGroundTrue Z . 
 
 #[export] Instance : Refinable init_data := mkEqRefinable init_data.
 #[export] Instance : Complete init_data := mkCompleteTrue init_data.
@@ -280,36 +277,46 @@ Defined.
 
 #[export] Instance : Refinable val := mkEqRefinable val.
 #[export] Instance : Complete val := mkCompleteTrue val.
-#[export] Instance : Ground val := mkGroundTrue val.
 
 #[export] Instance : Refinable mem := mkEqRefinable mem.
 #[export] Instance : Complete mem := mkCompleteTrue mem.
-#[export] Instance : Ground mem := mkGroundTrue mem.
 
 #[export] Instance : Refinable RTL.instruction := mkEqRefinable RTL.instruction.
 #[export] Instance : Complete RTL.instruction := mkCompleteTrue RTL.instruction.
-#[export] Instance : Ground RTL.instruction := mkGroundTrue RTL.instruction.
+
+#[local] Obligation Tactic := idtac.
+
+Definition refinement_instruction : relation instruction  := fun i1 i2 =>
+match i1, i2 with
+| Inop n1, Inop n2 => n1 ⊑ n2
+| Iop op1 args1 res1 n1, Iop op2 args2 res2 n2 => op1 ⊑ op2 /\ args1 ⊑ args2 /\ res1 ⊑ res2 /\ n1 ⊑ n2
+| Iload chunk1 addr1 args1 res1 n1, Iload chunk2 addr2 args2 res2 n2 => chunk1 ⊑ chunk2 /\ addr1 ⊑ addr2 /\ args1 ⊑ args2 /\ res1 ⊑ res2 /\ n1 ⊑ n2
+| Istore chunk1 addr1 args1 args1' n1, Istore chunk2 addr2 args2 args2' n2 => chunk1 ⊑ chunk2 /\ addr1 ⊑ addr2 /\ args1 ⊑ args2 /\ args1' ⊑ args2' /\ n1 ⊑ n2
+| Icall sig1 ros1 args1 res1 n1, Icall sig2 ros2 args2 res2 n2 => sig1 ⊑ sig2 /\ ros1 ⊑ ros2 /\ args1 ⊑ args2 /\ res1 ⊑ res2 /\ n1 ⊑ n2
+| Itailcall sig1 ros1 args1, Itailcall sig2 ros2 args2 => sig1 ⊑ sig2 /\ ros1 ⊑ ros2 /\ args1 ⊑ args2
+| Ibuiltin ef1 args1 res1 n1, Ibuiltin ef2 args2 res2 n2 => ef1 ⊑ ef2 /\ args1 ⊑ args2 /\ res1 ⊑ res2 /\ n1 ⊑ n2
+| Icond cond1 args1 n11 n12, Icond cond2 args2 n21 n22 => cond1 ⊑ cond2 /\ args1 ⊑ args2 /\ n11 ⊑ n21 /\ n12 ⊑ n22
+| Ijumptable r1 n1, Ijumptable r2 n2 => r1 ⊑ r2 /\ n1 ⊑ n2
+| Ireturn mr1, Ireturn mr2 => mr1 ⊑ mr2
+| _ , Inotimplemented => True
+| _ , _ => False
+end.
 
 #[export] Program Instance refinableInstruction : Refinable instruction :=
   {|
-    is_refinement i1 i2 := 
-        match i1, i2 with
-        | Inop n1, Inop n2 => n1 ⊑ n2
-        | Iop op1 args1 res1 n1, Iop op2 args2 res2 n2 => op1 ⊑ op2 /\ args1 ⊑ args2 /\ res1 ⊑ res2 /\ n1 ⊑ n2
-        | Iload chunk1 addr1 args1 res1 n1, Iload chunk2 addr2 args2 res2 n2 => chunk1 ⊑ chunk2 /\ addr1 ⊑ addr2 /\ args1 ⊑ args2 /\ res1 ⊑ res2 /\ n1 ⊑ n2
-        | Istore chunk1 addr1 args1 args1' n1, Istore chunk2 addr2 args2 args2' n2 => chunk1 ⊑ chunk2 /\ addr1 ⊑ addr2 /\ args1 ⊑ args2 /\ args1' ⊑ args2' /\ n1 ⊑ n2
-        | Icall sig1 ros1 args1 res1 n1, Icall sig2 ros2 args2 res2 n2 => sig1 ⊑ sig2 /\ ros1 ⊑ ros2 /\ args1 ⊑ args2 /\ res1 ⊑ res2 /\ n1 ⊑ n2
-        | Itailcall sig1 ros1 args1, Itailcall sig2 ros2 args2 => sig1 ⊑ sig2 /\ ros1 ⊑ ros2 /\ args1 ⊑ args2
-        | Ibuiltin ef1 args1 res1 n1, Ibuiltin ef2 args2 res2 n2 => ef1 ⊑ ef2 /\ args1 ⊑ args2 /\ res1 ⊑ res2 /\ n1 ⊑ n2
-        | Icond cond1 args1 n11 n12, Icond cond2 args2 n21 n22 => cond1 ⊑ cond2 /\ args1 ⊑ args2 /\ n11 ⊑ n21 /\ n12 ⊑ n22
-        | Ijumptable r1 n1, Ijumptable r2 n2 => r1 ⊑ r2 /\ n1 ⊑ n2
-        | Ireturn mr1, Ireturn mr2 => mr1 ⊑ mr2
-        | _, Inotimplemented => True
-        | _, _ => False
-        end
+    refinement i1 i2 := refinement_instruction i1 i2
   |}.
-Admit Obligations.
-
+  Next Obligation. 
+    red; intros [] [] []; intros H H0; cbn in *; eauto.
+    all: try solve [inversion H]; try solve [inversion H0].
+    all: destruct_ctx; repeat split; etransitivity; eauto.
+  Qed. 
+  Next Obligation.
+    intros [] [] H; cbn in *; eauto. 
+    all: try solve [inversion H].
+    all: destruct_ctx; repeat split; eapply is_right_reflexive; eauto.
+  Qed. 
+  
 Inductive is_complete_instruction : instruction -> Prop :=
 | is_complete_Inop : forall n, is_complete n -> is_complete_instruction (Inop n)
 | is_complete_Iop : forall op args res n, is_complete op -> is_complete args -> is_complete res -> is_complete n -> is_complete_instruction (Iop op args res n)
@@ -326,28 +333,50 @@ Inductive is_complete_instruction : instruction -> Prop :=
 { 
   is_complete := is_complete_instruction
 }.
-Admit Obligations.
+Next Obligation.
+  intros []; inversion 1; cbn in *; red; cbn. 
+  all: destruct_ctx; repeat split; eapply is_complete_spec; eauto.
+Qed. 
 
-#[export] Instance groundInstruction : Ground instruction. 
-Proof. Admitted.
+
+#[export, refine ] Instance groundInstruction : Ground instruction := {}. 
+Proof.
+  intros []; inversion 1; intros [] Href; red in Href; cbn in *.
+  all: try solve [inversion Href].
+  all: destruct_ctx; f_equal; eauto.
+  all: eapply is_complete_minimal; eauto.
+ Qed.  
 
 #[export] Program Instance refinablePTree {A} `{Refinable A} : Refinable (PTree.t A) := 
 {
-  is_refinement t1 t2 := forall pc, t1 ! pc ⊑ t2 ! pc  
+  refinement t1 t2 := forall pc, t1 ! pc ⊑ t2 ! pc  
 }.
-Admit Obligations.
+Next Obligation.
+  red; intros. etransitivity; eauto.
+Qed.    
+Next Obligation.
+  cbn; intros. eapply is_right_reflexive; eauto.
+Qed.    
 
 #[export] Program Instance completePTree {A} `{Complete A} : Complete (PTree.t A) := 
 {
   is_complete t := forall pc, is_complete (t ! pc)
 }.
-Admit Obligations.
+Next Obligation.
+  cbn; intros; red; cbn. intro. eapply is_complete_spec; eauto.
+Qed.
 
+(*
 #[export] Program Instance groundPTree {A} `{Ground A} : Ground (PTree.t A) := 
 {
   is_complete_minimal := _
 }.
-Admit Obligations.
+Next Obligation.
+(*   cbn; intros; cbn. eapply is_complete_minimal; eauto.
+  Unshelve. 
+ *)
+Admitted.
+*)
 
 #[export] Instance : Refinable romem. apply refinablePTree. Defined.
 #[export] Instance : Complete romem. apply completePTree. Defined.
@@ -362,7 +391,7 @@ Proof. intros; unfold_refinement; intros; unfold_refinement; destruct (_ ! _); t
 
 #[export, refine] Instance : Refinable function := 
   {
-    is_refinement f1 f2 := 
+    refinement f1 f2 := 
     (fn_sig f1) ⊑ (fn_sig f2) /\ (fn_params f1) ⊑ (fn_params f2) /\ (fn_stacksize f1) ⊑ (fn_stacksize f2) /\ (fn_code f1) ⊑ (fn_code f2) /\ (fn_entrypoint f1) ⊑ (fn_entrypoint f2)
   }.
 Proof. 
@@ -378,17 +407,23 @@ Defined.
   is_complete (fn_sig f) /\ is_complete (fn_params f) /\ is_complete (fn_stacksize f) /\ is_complete (fn_code f) /\ is_complete (fn_entrypoint f)
   (* forall pc, is_complete pc -> is_complete ((fn_code f) ! pc) *)
 }.
-Admit Obligations.
+Next Obligation.
+  cbn; intros. destruct_ctx. red; cbn. repeat split; eauto; eapply is_complete_spec; eauto.
+Qed. 
 
+(*
 #[export] Instance : Ground function.
 Proof. constructor. intros [] HC [] HR. unfold_complete in HC; unfold_refinement in HR. destruct_ctx. unshelve f_equal; unshelve eapply is_complete_minimal; eauto; try typeclasses eauto.
 Defined.
+*)
 
+(*
 
 #[export] Program Instance refinableGlobvar {V} `{Refinable V} : Refinable (globvar V) := 
 {
-  is_refinement g1 g2 := (gvar_info g1) ⊑ (gvar_info g2) /\ (gvar_init g1) ⊑ (gvar_init g2) /\ (gvar_readonly g1) ⊑ (gvar_readonly g2) /\ (gvar_volatile g1) ⊑ (gvar_volatile g2)
+  refinement g1 g2 := (gvar_info g1) ⊑ (gvar_info g2) /\ (gvar_init g1) ⊑ (gvar_init g2) /\ (gvar_readonly g1) ⊑ (gvar_readonly g2) /\ (gvar_volatile g1) ⊑ (gvar_volatile g2)
 }.
+Next Obligation. 
 Admit Obligations.
 
 #[export] Program Instance completeGlobvar {V} `{Complete V} : Complete (globvar V) := 
@@ -397,13 +432,13 @@ Admit Obligations.
 }.
 Admit Obligations.
 
-Inductive is_refinement_globdef {F V} `{Refinable F} `{Refinable V} : globdef F V -> globdef F V -> Prop :=
-| is_refinement_Gfun : forall f1 f2, f1 ⊑ f2 -> is_refinement_globdef (Gfun f1) (Gfun f2)
-| is_refinement_Gvar : forall v1 v2, v1 ⊑ v2 -> is_refinement_globdef (Gvar v1) (Gvar v2).
+Inductive refinement_globdef {F V} `{Refinable F} `{Refinable V} : globdef F V -> globdef F V -> Prop :=
+| refinement_Gfun : forall f1 f2, f1 ⊑ f2 -> refinement_globdef (Gfun f1) (Gfun f2)
+| refinement_Gvar : forall v1 v2, v1 ⊑ v2 -> refinement_globdef (Gvar v1) (Gvar v2).
 
 #[export] Program Instance refinableGlobdef {F V} `{Refinable F} `{Refinable V} : Refinable (globdef F V) := 
 {
-  is_refinement := is_refinement_globdef
+  refinement := refinement_globdef
 }.
 Admit Obligations.
 
@@ -416,18 +451,29 @@ Inductive is_complete_globdef {F V} `{Complete F} `{Complete V} : globdef F V ->
   is_complete := is_complete_globdef
 }.
 Admit Obligations.
+*)
 
+Definition refinementFunDef {F} `{Refinable F} : relation (AST.fundef F) := fun fd1 fd2 =>
+  match fd1, fd2 with
+  | External ef1, External ef2 => ef1 ⊑ ef2
+  | Internal f1, Internal f2 => f1 ⊑ f2
+  | _, _ => False
+  end.
 
 #[export] Program Instance refinableASTFundef {F} `{Refinable F} : Refinable (AST.fundef F) := 
 {
-  is_refinement fd1 fd2 := 
-    match fd1, fd2 with
-    | External ef1, External ef2 => ef1 ⊑ ef2
-    | Internal f1, Internal f2 => f1 ⊑ f2
-    | _, _ => False
-    end
+  refinement := refinementFunDef 
 }.
-Admit Obligations.
+Next Obligation.
+  red; cbn; intros ? ? [] [] []; cbn; eauto. 
+  all: try inversion 1; try inversion 2.
+  all: try etransitivity; eauto.
+Qed. 
+Next Obligation.
+  red; cbn; intros ? ? [] []; cbn; eauto. 
+  all: try inversion 1; try inversion 2.
+  eapply is_right_reflexive; eauto.
+Qed. 
 
 #[export] Program Instance completeASTFundef {F} `{Complete F} : Complete (AST.fundef F) := 
 {
@@ -437,47 +483,58 @@ Admit Obligations.
     | Internal f => is_complete f
     end
 }.
-Admit Obligations. 
+Next Obligation.
+  red; cbn; intros ? ? [] []; cbn; eauto. 
+Qed. 
 
+(*
 #[export] Instance groundASTFundef {F} `{Ground F} : Ground (AST.fundef F).
 Proof. constructor. intros [] ? [] ?; try contradiction;
   try f_equal; eauto; eapply is_complete_minimal; eauto.
 Qed.
+*)
 
 #[export] Instance : Refinable fundef. apply refinableASTFundef. Defined.
 #[export] Instance : Complete fundef. apply completeASTFundef. Defined.
-#[export] Instance : Ground fundef. Admitted.
+(* #[export] Instance : Ground fundef. Admitted. *)
 
 #[export] Instance : Refinable RTL.program := mkEqRefinable RTL.program.
 #[export] Instance : Complete RTL.program := mkCompleteTrue RTL.program.
 
 #[export] Program Instance refinableASTProgram : Refinable program := 
 {
-  is_refinement p1 p2 := forall ros rs, find_function (Genv.globalenv p1) ros rs ⊑ find_function (Genv.globalenv p2) ros rs
+  refinement p1 p2 := forall ros rs, find_function (Genv.globalenv p1) ros rs ⊑ find_function (Genv.globalenv p2) ros rs
 }.
-Admit Obligations.
+Next Obligation.
+  red; cbn; intros. etransitivity; eauto.
+Qed. 
+Next Obligation.
+  cbn; intros. eapply is_right_reflexive; eauto.
+Qed. 
 
 #[export] Program Instance completeASTProgram : Complete program := 
 {
   is_complete p := (forall ros rs, is_complete (find_function (Genv.globalenv p) ros rs)) /\ forall b, is_complete (Genv.find_funct_ptr (Genv.globalenv p) b)
 }.
-Admit Obligations.
+Next Obligation.
+  red; cbn; intros. destruct_ctx. eapply is_complete_spec; eauto.
+Qed. 
 
 #[export] Instance : Refinable program. apply refinableASTProgram. Defined.
 #[export] Instance : Complete program. apply completeASTProgram. Defined.
 
 #[export] Instance : Refinable code. apply refinablePTree. Defined.
 #[export] Instance : Complete code. apply completePTree. Defined.
-#[export] Instance : Ground code. apply groundPTree. Defined.
-
+(* #[export] Instance : Ground code. apply groundPTree. Defined.
+ *)
 #[export] Instance : Refinable code. apply refinablePTree. Defined.
 #[export] Instance : Complete code. apply completePTree. Defined.
-#[export] Instance : Ground code. apply groundPTree. Defined.
-
+(* #[export] Instance : Ground code. apply groundPTree. Defined.
+ *)
 
 #[export, refine] Instance : Refinable stackframe := 
 {
-  is_refinement '(Stackframe r1 f1 v1 n1 rs1) '(Stackframe r2 f2 v2 n2 rs2) := 
+  refinement '(Stackframe r1 f1 v1 n1 rs1) '(Stackframe r2 f2 v2 n2 rs2) := 
   r1 ⊑ r2 /\ f1 ⊑ f2 /\ v1 ⊑ v2 /\ n1 ⊑ n2 /\ rs1 ⊑ rs2
 }.
 Proof.
@@ -488,16 +545,21 @@ Proof.
     repeat split; try eapply is_right_reflexive; eauto.
 Defined.
 
-Inductive is_refinement_state : state -> state -> Prop :=
-| is_refinement_State : forall sfr1 sfr2 f1 f2 v1 v2 n1 n2 r1 r2 m1 m2, 
-  sfr1 ⊑ sfr2 -> f1 ⊑ f2 -> v1 ⊑ v2 -> n1 ⊑ n2 -> r1 ⊑ r2 -> m1 ⊑ m2 -> is_refinement_state (State sfr1 f1 v1 n1 r1 m1) (State sfr2 f2 v2 n2 r2 m2)
-| is_refinement_Callstate : forall sfr1 sfr2 fd1 fd2 v1 v2 m1 m2,
-  sfr1 ⊑ sfr2 -> fd1 ⊑ fd2 -> v1 ⊑ v2 -> m1 ⊑ m2 -> is_refinement_state (Callstate sfr1 fd1 v1 m1) (Callstate sfr2 fd2 v2 m2)
-| is_refinement_Returnstate : forall sfr1 sfr2 v1 v2 m1 m2, 
-  sfr1 ⊑ sfr2 -> v1 ⊑ v2 -> m1 ⊑ m2 -> is_refinement_state (Returnstate sfr1 v1 m1) (Returnstate sfr2 v2 m2).
+Inductive refinement_state : state -> state -> Prop :=
+| refinement_State : forall sfr1 sfr2 f1 f2 v1 v2 n1 n2 r1 r2 m1 m2, 
+  sfr1 ⊑ sfr2 -> f1 ⊑ f2 -> v1 ⊑ v2 -> n1 ⊑ n2 -> r1 ⊑ r2 -> m1 ⊑ m2 -> refinement_state (State sfr1 f1 v1 n1 r1 m1) (State sfr2 f2 v2 n2 r2 m2)
+| refinement_Callstate : forall sfr1 sfr2 fd1 fd2 v1 v2 m1 m2,
+  sfr1 ⊑ sfr2 -> fd1 ⊑ fd2 -> v1 ⊑ v2 -> m1 ⊑ m2 -> refinement_state (Callstate sfr1 fd1 v1 m1) (Callstate sfr2 fd2 v2 m2)
+| refinement_Returnstate : forall sfr1 sfr2 v1 v2 m1 m2, 
+  sfr1 ⊑ sfr2 -> v1 ⊑ v2 -> m1 ⊑ m2 -> refinement_state (Returnstate sfr1 v1 m1) (Returnstate sfr2 v2 m2).
 
 #[export] Program Instance : Refinable state := 
 {
-  is_refinement := is_refinement_state
+  refinement := refinement_state
 }.
-Admit Obligations.
+Next Obligation.
+  intros ? ? ? []; inversion 1; constructor; etransitivity; eauto.
+Qed. 
+Next Obligation.
+  intros ? ? []; constructor; eapply is_right_reflexive; eauto.
+Qed.
