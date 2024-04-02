@@ -1,4 +1,4 @@
-Require Import Coq.Relations.Relation_Definitions.
+Require Import Coq.Relations.Relation_Definitions RelationClasses.
 
 Ltac clear_ctx :=
   repeat (match goal with
@@ -23,25 +23,29 @@ Ltac clear_ctx :=
           end
           ).
 
+#[local] Obligation Tactic := idtac.
+
 Class Refinable (A : Type) : Type :=
   {
-    is_refinement : relation A ;
-    is_transitive : transitive A is_refinement;
-    is_right_reflexive : forall a1 a2, is_refinement a1 a2 -> is_refinement a2 a2
+    refinement : relation A ;
+    is_transitive : transitive A refinement;
+    is_right_reflexive : forall a1 a2, refinement a1 a2 -> refinement a2 a2
   }.
 
-Infix "⊑" := is_refinement (at level 70).
+Infix "⊑" := refinement (at level 70).
 
-Arguments is_refinement : simpl never.
+Arguments refinement : simpl never.
+
+#[export] Instance refinableTransitive {A} `{Refinable A} : Transitive refinement := { transitivity := is_transitive }.
 
 #[export, refine] Instance refinableFun {A B} `{Refinable A} `{Refinable B} : Refinable (A -> B) :=
   {
-    is_refinement f g := forall a1 a2, a1 ⊑ a2 -> f a1 ⊑ g a2 /\ f a1 ⊑ f a2 /\ g a1 ⊑ g a2 ;
+    refinement f g := forall a1 a2, a1 ⊑ a2 -> f a1 ⊑ g a2 /\ f a1 ⊑ f a2 /\ g a1 ⊑ g a2 ;
   }.
 Proof.
   - intros f g h Hmono1 Hmono2 a1 a2 Hprec; split.
-    edestruct Hmono1; eauto.
-    eapply is_transitive; [ apply H1 | apply Hmono2]. eapply is_right_reflexive in Hprec; eauto.
+    edestruct Hmono1; eauto. 
+    etransitivity; [ apply H1 | apply Hmono2]. eapply is_right_reflexive in Hprec; eauto.
     split. edestruct Hmono1; clear_ctx; eauto.
     edestruct Hmono2; clear_ctx; eauto.
   - intros f g Hfg a a' Hprec. repeat split; edestruct Hfg; eauto; destruct H2; eauto.
@@ -71,7 +75,7 @@ Defined.
 
 Lemma is_complete_const_fun : forall {A B} `{Complete A} `{Complete B} (b : B), is_complete b -> is_complete (fun _ : A => b).
 Proof.  simpl; intros. split.
-  - unfold is_refinement; cbn. eapply is_complete_spec in H3; eauto.
+  - unfold refinement; cbn. eapply is_complete_spec in H3; eauto.
   - eauto.
 Qed.
 
@@ -85,8 +89,8 @@ Class Ground (A : Type) `{Refinable A} `{Complete A} : Type :=
 
 Tactic Notation "unfold_complete" "in" hyp(H) := unfold is_complete in H; cbn in H.
 Tactic Notation "unfold_complete" := unfold is_complete; cbn.
-Tactic Notation "unfold_refinement" := unfold is_refinement; cbn.
-Tactic Notation "unfold_refinement" "in" hyp(H) := unfold is_refinement in H; cbn in H.
+Tactic Notation "unfold_refinement" := unfold refinement; cbn.
+Tactic Notation "unfold_refinement" "in" hyp(H) := unfold refinement in H; cbn in H.
   
 From Coq Require Import FunctionalExtensionality.
 
@@ -137,8 +141,8 @@ Section Monotonicity.
   Next Obligation.
     intros ? ? ? ? ? g h ? ? a1 a2 Hprec [b [? ?]].
     exists b. split.
-    - apply is_transitive with (g a1) ; auto. eapply is_complete_spec in Hcg; edestruct Hcg; eauto.
-    - apply is_transitive with (h a1) ; auto. eapply is_complete_spec in Hch; edestruct Hch; eauto.
+    - transitivity (g a1) ; auto. eapply is_complete_spec in Hcg; edestruct Hcg; eauto.
+    - transitivity (h a1) ; auto. eapply is_complete_spec in Hch; edestruct Hch; eauto.
   Qed.
   Next Obligation.
     intros ? ? ? ? ? g h ? ? a1 a2 Hprec [? ?].
@@ -177,7 +181,7 @@ Section Monotonicity.
     }.
   Next Obligation.
     intros ? ? ? ? ? g [Hcg ?] b a1 a2 Hprec ?.
-    apply is_transitive with (g a1); try apply Hcg; eauto.
+    transitivity (g a1); try apply Hcg; eauto.
   Qed.
   Next Obligation.
   intros ? ? ? ? ? g [Hcg ?] b a1 a2 Hprec [? ?].
@@ -192,34 +196,6 @@ Section Monotonicity.
   Next Obligation.
     intros B ? ? ? ? g [? ?] ? a Hca. split; [intros [? Hbg] | intros <-]; eauto.
   Qed.
-
-  (* #[export] Program Instance monotonizable_eq_3 {B} `{HB : Ground B}
-    (g : A -> B) (Hcg : is_complete g) (b : B) : Monotonizable (fun a => b = g a) | 1 := {
-      monotone := fun a => b ⊑ g a ;
-      antitone := fun a => is_complete b /\ g a ⊑ b ;
-      is_monotone := _ ;
-      is_antitone := _ ;
-      complete_monotone_is_equivalent := _ ;
-      complete_antitone_is_equivalent := _
-    }.
-  Next Obligation.
-    intros ? ? ? ? ? g [Hcg ?] b a1 a2 Hprec ?.
-    apply is_transitive with (g a1); try apply Hcg; eauto.
-  Qed.
-  Next Obligation.
-  intros ? ? ? ? ? g [Hcg ?] b a1 a2 Hprec [? ?]; split; eauto.
-  apply is_transitive with (g a2); try apply Hcg; eauto.
-  Qed.
-  Next Obligation.
-    intros B ? ? ? ? g [? ?] ? a Hca. split; [intros Hbg | intros ->].
-    - eapply is_complete_minimal in Hbg; eauto.
-    - apply is_complete_spec; eauto.
-  Qed.
-  Next Obligation.
-    intros B ? ? ? ? g [? ?] ? a Hca. split; [intros [? Hbg] | intros ->].
-    - eapply is_complete_minimal in Hbg; eauto.
-    - split; eauto; apply is_complete_spec; eauto.
-  Qed. *)
 
   #[export] Program Instance monotonizable_eq_fun {B C} `{HB : Refinable B} `{HC : Refinable C}
     (g h : A -> B -> C) {Hmono : Monotonizable (fun a => forall b, g a b = h a b)} : Monotonizable (fun a => g a = h a) := {
@@ -409,13 +385,13 @@ Section Monotonicity.
       complete_antitone_is_equivalent := _
     }.
   Next Obligation.
-    intros ? ? ? ? ? g ? b ? a1 a2 Hprec ?.
-    apply is_transitive with (g a1); eauto.
+    intros ? ? ? ? ? g ? b ? a1 a2 Hprec ?; cbn. 
+    transitivity (g a1); eauto.
     apply Hcg; eauto.
   Qed.
   Next Obligation.
-    intros ? ? ? ? ? g ? b ? a1 a2 Hprec ?.
-    apply is_transitive with (g a2); eauto.
+    intros ? ? ? ? ? g ? b ? a1 a2 Hprec ?; cbn.
+    transitivity (g a2); eauto.
     apply Hcg; eauto.
   Qed.
   Next Obligation.
@@ -438,7 +414,7 @@ Lemma fun_is_complete_if_complete_dom : forall {A B} `{Complete A} `{Complete B}
     forall a, is_complete a -> is_complete (fun f : A -> B => f a).
 Proof.
   simpl; intros; split.
-  - unfold is_refinement; cbn. intros. edestruct H4; eauto. eapply is_complete_spec in H3; eauto.
+  - unfold refinement; cbn. intros. edestruct H4; eauto. eapply is_complete_spec in H3; eauto.
   - intros. destruct H4. eauto.
 Qed.
 
