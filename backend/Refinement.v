@@ -1,5 +1,27 @@
-Require Import Auto.
 Require Import Coq.Relations.Relation_Definitions.
+
+Ltac clear_ctx :=
+  repeat (match goal with
+          | [H : _ \/ _ |- _ ] => 
+            let Hl := fresh H in 
+            let Hr := fresh H in
+            destruct H as [Hl | Hr]
+          | [H : _ /\ _ |- _ ] => 
+            let Hl := fresh H in 
+            let Hr := fresh H in
+            destruct H as [Hl Hr]
+          | [H : _ <-> _ |- _ ] => 
+            let Hl := fresh H in 
+            let Hr := fresh H in
+            destruct H as [Hl Hr]
+          | [H : exists (x : _), _ |- _ ] =>
+            let x := fresh x in
+            destruct H as [x H]
+          | [H : ?P , H2 : ?P |- _ ] => clear H2
+          | [H : (?a && ?b)%bool = true |- _] =>
+          apply andb_prop in H
+          end
+          ).
 
 Class Refinable (A : Type) : Type :=
   {
