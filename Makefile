@@ -132,7 +132,7 @@ BACKEND=\
   SelectOp.v SelectDiv.v SplitLong.v SelectLong.v Selection.v \
   SelectOpproof.v SelectDivproof.v SplitLongproof.v \
   SelectLongproof.v Selectionproof.v \
-  Registers.v RTL.v \
+  Registers.v RTL.v RTL_Incomplete.v \
   RTLgen.v RTLgenspec.v RTLgenproof.v \
   Tailcall.v Tailcallproof.v \
   Inlining.v Inliningspec.v Inliningproof.v \
@@ -142,7 +142,9 @@ BACKEND=\
   ValueDomain.v ValueAOp.v ValueAnalysis.v \
   ConstpropOp.v Constprop.v ConstpropOpproof.v Constpropproof.v \
   CSEdomain.v CombineOp.v CSE.v CombineOpproof.v CSEproof.v \
-  NeedDomain.v NeedOp.v Deadcode.v Deadcodeproof.v \
+  NeedDomain.v NeedOp.v \
+  Refinement.v RefinementInstances.v \
+  Deadcode.v Deadcodeproof.v \
   Unusedglob.v Unusedglobproof.v \
   Machregs.v Locations.v Conventions1.v Conventions.v LTL.v \
   Allocation.v Allocproof.v \
