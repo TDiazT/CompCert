@@ -1688,20 +1688,26 @@ Section TRANSF_PROGRAM_CORRECT.
     RTL_Incomplete.find_function (Genv.globalenv tprog') ros rs = Some (to_RTL_Incomplete_fundef f) ->
     find_function (Genv.globalenv tprog) ros rs = Some f.
   Proof.
-    destruct ros; intro H; cbn. 
-    (* - set (rs # r) in *. exploit Genv.find_funct_inv; eauto. intros [b EQ]. cbn -[tprog'] in H. rewrite EQ in H. cbn. rewrite EQ.
-      rewrite Genv.find_funct_find_funct_ptr in H.
-      rewrite Genv.find_funct_find_funct_ptr.
-      eapply Genv.find_funct_ptr_match in H. auto.
-      rewrite Genv.find_funct_find_funct_ptr in H. 
-      rewrite Genv.find_funct_find_funct_ptr in H. 
-      
-      eapply Genv.find_funct_ptr_inversion in H.
-      
-  
-    
-    eapply Genv.find_funct_match in H.  *)
-    Admitted.  
+    pose proof (Hprog := match_tprog').
+    destruct ros; intro H; cbn -[tprog'] in *.
+    - unfold Genv.find_funct in *.
+      destruct (_ # _); inversion H. clear H1. destruct (Ptrofs.eq_dec _ _); inversion H. clear H1; subst.  
+      unfold Genv.find_funct_ptr in *. 
+      pose proof (Genv.find_def_match_2 Hprog b).
+      unfold fundef_ in *. 
+      set (Genv.find_def (Genv.globalenv tprog') b) in *.
+      destruct o; [|inversion H]. inversion H0; subst. 
+      inversion H3; subst; f_equal. inversion H. now eapply to_RTL_Incomplete_fundef_injective.
+      inversion H.
+    - erewrite <- find_symbol_tprog'. destruct (Genv.find_symbol _ _); inversion H.
+    unfold Genv.find_funct_ptr in *. 
+    pose proof (Genv.find_def_match_2 Hprog b).
+    unfold fundef_ in *. 
+    set (Genv.find_def (Genv.globalenv tprog') b) in *. clear H1. 
+    destruct o; [|inversion H]. inversion H0; subst. 
+    inversion H3; subst; f_equal. inversion H. now eapply to_RTL_Incomplete_fundef_injective.
+    inversion H.
+  Qed. 
 
   Lemma symbol_address_tprog' id ofs : 
     Senv.symbol_address (Genv.globalenv tprog') id ofs = Senv.symbol_address (Genv.globalenv tprog) id ofs.
@@ -1723,8 +1729,15 @@ Section TRANSF_PROGRAM_CORRECT.
   Lemma find_var_info_tprog' b : 
     Genv.find_var_info (Genv.globalenv tprog') b = Genv.find_var_info (Genv.globalenv tprog) b.
   Proof.
-    unfold Genv.find_var_info, Genv.find_def.
-  Admitted.
+    unfold Genv.find_var_info.  pose proof (Hprog := match_tprog').
+    pose proof (Genv.find_def_match_2 Hprog b).
+    set (Genv.find_def (Genv.globalenv tprog') b) in *.
+    case_eq (Genv.find_def (Genv.globalenv tprog) b). 
+    - intros ? He. cbn in *. unfold fundef_ in He. rewrite He in H.
+      inversion H. subst. inversion H2. subst; eauto. inversion H0; subst; eauto.         
+    - intros He. unfold fundef_ in He. rewrite He in H.
+      inversion H; eauto.
+  Qed.
 
   Lemma external_call_tprog' ef vargs m t vres m' : 
     external_call ef (Genv.globalenv tprog') vargs m t vres m' ->
@@ -1901,6 +1914,9 @@ Theorem transf_program_correct:
   Qed. 
 
 End TRANSF_PROGRAM_CORRECT.
+
+Print Assumptions transf_program_correct.
+
 Definition transf_program_aux (p: program) transf_f: res program :=
   transform_partial_program (AST.transf_partial_fundef (transf_f (romem_for p))) p.
 
