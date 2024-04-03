@@ -252,6 +252,20 @@ Notation state := (@state_ instruction).
 Section RELSEM.
 Variable ge: genv.
 
+Definition map_function_ {A B} (f : A -> B) (fn : @function_ A) : @function_ B :=
+  (mkfunction (fn_sig fn) (fn_params fn) (fn_stacksize fn) (PTree.map (fun _ => f ) (fn_code fn)) (fn_entrypoint fn)).
+
+Definition map_stackframe {A B} (fmap : @function_ A -> @function_ B) : @stackframe A -> @stackframe B 
+  := fun s => match s with 
+      Stackframe r f v n rs => Stackframe r (fmap f) v n rs
+  end.
+  
+Definition map_state {A B} (f : A -> B) (s : @state_ A) : @state_ B :=
+  match s with 
+  | State stack fn v n r m => State (List.map (map_stackframe (map_function_ f)) stack) (map_function_ f fn) v n r m
+  | Callstate stack fn vl m => Callstate (List.map (map_stackframe (map_function_ f)) stack) (AST.transf_fundef (map_function_ f) fn) vl m
+  | Returnstate stack v m => Returnstate (List.map (map_stackframe (map_function_ f)) stack) v m
+  end.
 
 
 (** The transitions are presented as an inductive predicate
