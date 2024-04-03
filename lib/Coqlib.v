@@ -1214,6 +1214,13 @@ Proof.
   intros. auto with coqlib.
 Qed.
 
+Lemma list_forall2_map:  forall (A B C: Type) (P: A -> B -> Prop) (l1: list A) (l2: list C) f,
+list_forall2 (fun x y => P x (f y)) l1 l2 -> list_forall2 P l1 (map f l2).
+Proof.
+  intros until f. induction 1; subst; econstructor; eauto. 
+Qed.
+
+
 (** Dropping the first N elements of a list. *)
 
 Fixpoint list_drop (A: Type) (n: nat) (x: list A) {struct n} : list A :=
