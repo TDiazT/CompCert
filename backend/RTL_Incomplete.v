@@ -468,3 +468,37 @@ Definition to_RTL_Incomplete_instruction (i : RTL.instruction) : instruction :=
   | RTL.Ijumptable arg tbl => Ijumptable arg tbl
   | RTL.Ireturn optarg => Ireturn optarg
   end.
+
+Lemma to_RTL_Incomplete_instruction_retract i H : to_RTL_Incomplete_instruction (to_RTL_instruction i H) = i.
+Proof.
+  destruct i; eauto. destruct (H eq_refl).
+Qed.   
+
+Definition to_RTL_Incomplete_function := map_function_ to_RTL_Incomplete_instruction.
+
+Definition to_RTL_Incomplete_fundef :=  AST.transf_fundef to_RTL_Incomplete_function.
+
+Lemma to_RTL_Incomplete_instruction_injective i i': to_RTL_Incomplete_instruction i = to_RTL_Incomplete_instruction i' -> i = i'. 
+Proof.
+  destruct i, i'; cbn; inversion 1; f_equal; eauto.
+Qed.    
+
+Lemma to_RTL_Incomplete_function_injective f f' : to_RTL_Incomplete_function f = to_RTL_Incomplete_function f' -> f = f'.
+Proof.
+  destruct f, f'; unfold to_RTL_Incomplete_function, map_function_; cbn; inversion 1; f_equal; cbn.
+  eapply PTree.extensionality; intro p. eapply (f_equal (fun f => f ! p)) in H4.
+  repeat rewrite PTree.gmap in H4. unfold option_map in H4. repeat destruct (_ ! _); inversion H4; f_equal; eauto.
+  now apply to_RTL_Incomplete_instruction_injective.
+Qed.         
+
+Lemma stackframe_to_RTL_Incomplete_function_injective s s' : map_stackframe to_RTL_Incomplete_function s = map_stackframe to_RTL_Incomplete_function s' -> s = s'.
+Proof.
+  destruct s, s'; cbn. inversion 1. f_equal; subst. eapply to_RTL_Incomplete_function_injective; eauto.
+  unfold to_RTL_Incomplete_function, map_function_; cbn; f_equal; eauto.
+Qed.
+
+Lemma stack_to_RTL_Incomplete_function_injective s s' : map (map_stackframe to_RTL_Incomplete_function) s = map (map_stackframe to_RTL_Incomplete_function) s' -> s = s'.
+Proof.
+  revert s'; induction s; destruct s'; inversion 1; f_equal; eauto.
+  eapply stackframe_to_RTL_Incomplete_function_injective; eauto.
+Qed. 
