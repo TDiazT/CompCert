@@ -366,17 +366,11 @@ Next Obligation.
   cbn; intros; red; cbn. intro. eapply is_complete_spec; eauto.
 Qed.
 
-(*
-#[export] Program Instance groundPTree {A} `{Ground A} : Ground (PTree.t A) := 
-{
-  is_complete_minimal := _
-}.
+#[export] Program Instance groundPTree {A} `{Ground A} : Ground (PTree.t A).
 Next Obligation.
-(*   cbn; intros; cbn. eapply is_complete_minimal; eauto.
-  Unshelve. 
- *)
-Admitted.
-*)
+  cbn; intros; cbn. eapply PTree.extensionality. intro p; specialize (H4 p).
+  eapply is_complete_minimal; eauto.
+Qed.
 
 #[export] Instance : Refinable romem. apply refinablePTree. Defined.
 #[export] Instance : Complete romem. apply completePTree. Defined.
@@ -411,11 +405,9 @@ Next Obligation.
   cbn; intros. destruct_ctx. red; cbn. repeat split; eauto; eapply is_complete_spec; eauto.
 Qed. 
 
-(*
 #[export] Instance : Ground function.
 Proof. constructor. intros [] HC [] HR. unfold_complete in HC; unfold_refinement in HR. destruct_ctx. unshelve f_equal; unshelve eapply is_complete_minimal; eauto; try typeclasses eauto.
 Defined.
-*)
 
 (*
 
@@ -487,16 +479,16 @@ Next Obligation.
   red; cbn; intros ? ? [] []; cbn; eauto. 
 Qed. 
 
-(*
+
 #[export] Instance groundASTFundef {F} `{Ground F} : Ground (AST.fundef F).
 Proof. constructor. intros [] ? [] ?; try contradiction;
   try f_equal; eauto; eapply is_complete_minimal; eauto.
 Qed.
-*)
+
 
 #[export] Instance : Refinable fundef. apply refinableASTFundef. Defined.
 #[export] Instance : Complete fundef. apply completeASTFundef. Defined.
-(* #[export] Instance : Ground fundef. Admitted. *)
+#[export] Instance : Ground fundef. apply groundASTFundef.  Defined. 
 
 #[export] Instance : Refinable RTL.program := mkEqRefinable RTL.program.
 #[export] Instance : Complete RTL.program := mkCompleteTrue RTL.program.
@@ -522,16 +514,8 @@ Qed.
 
 #[export] Instance : Refinable program. apply refinableASTProgram. Defined.
 #[export] Instance : Complete program. apply completeASTProgram. Defined.
-
-#[export] Instance : Refinable code. apply refinablePTree. Defined.
-#[export] Instance : Complete code. apply completePTree. Defined.
-(* #[export] Instance : Ground code. apply groundPTree. Defined.
- *)
-#[export] Instance : Refinable code. apply refinablePTree. Defined.
-#[export] Instance : Complete code. apply completePTree. Defined.
-(* #[export] Instance : Ground code. apply groundPTree. Defined.
- *)
-
+(* #[export, refine] Instance : Ground program := {}. *)
+ 
 #[export, refine] Instance : Refinable stackframe := 
 {
   refinement '(Stackframe r1 f1 v1 n1 rs1) '(Stackframe r2 f2 v2 n2 rs2) := 
