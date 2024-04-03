@@ -118,25 +118,19 @@ Section Monotonicity.
     apply HP.(complete_monotone_is_equivalent); eauto.
   Qed.
 
+  Obligation Tactic :=  try now intuition.
+
   #[export] Program Instance monotonizable_const (P : Prop) : Monotonizable (fun a => P) := {
       monotone := fun _ => P ;
       antitone := fun _ => P ;
-      is_monotone := ltac:(eauto) ;
-      is_antitone := ltac:(eauto) ;
-      complete_monotone_is_equivalent := ltac:(now eauto) ;
-      complete_antitone_is_equivalent := ltac:(now eauto)
     }.
-
+  
   #[export] Program Instance monotonizable_eq {B} `{HB : Ground B}
     (g h : A -> B) (Hcg : is_complete g) (Hch : is_complete h)
     : Monotonizable (fun a => g a = h a) | 2
     := {
       monotone := fun a => exists b, b ⊑ g a /\ b ⊑ h a ;
       antitone := fun a => is_complete (g a) /\ g a = h a ; 
-      is_monotone := _ ;
-      is_antitone := _ ;
-      complete_monotone_is_equivalent := _ ;
-      complete_antitone_is_equivalent := _
     }.
   Next Obligation.
     intros ? ? ? ? ? g h ? ? a1 a2 Hprec [b [? ?]].
@@ -174,10 +168,6 @@ Section Monotonicity.
     (g : A -> B) (Hcg : is_complete g) (b : B) : Monotonizable (fun a => g a = b) | 1 := {
       monotone := fun a => b ⊑ g a ;
       antitone := fun a => is_complete (g a) /\ g a = b ;
-      is_monotone := _ ;
-      is_antitone := _ ;
-      complete_monotone_is_equivalent := _ ;
-      complete_antitone_is_equivalent := _
     }.
   Next Obligation.
     intros ? ? ? ? ? g [Hcg ?] b a1 a2 Hprec ?.
@@ -201,10 +191,6 @@ Section Monotonicity.
     (g h : A -> B -> C) {Hmono : Monotonizable (fun a => forall b, g a b = h a b)} : Monotonizable (fun a => g a = h a) := {
       monotone := Hmono.(monotone) ;
       antitone := Hmono.(antitone) ;
-      is_monotone := _ ;
-      is_antitone := _ ;
-      complete_monotone_is_equivalent := _ ;
-      complete_antitone_is_equivalent := _
     }.
   Next Obligation.
     intros B C HB HC g h Hmono a1 a2 Hprec Hmono1.
@@ -233,10 +219,6 @@ Section Monotonicity.
     {
       monotone := fun a => forall b, (HPB b).(monotone) a ;
       antitone := fun a => forall b, (HPB b).(antitone) a ;
-      is_monotone := _ ;
-      is_antitone := _ ;
-      complete_monotone_is_equivalent := _ ;
-      complete_antitone_is_equivalent := _
     }.
   Next Obligation.
     intros B P HPB a1 a2 Hprec Hmono; simpl; intros b.
@@ -261,10 +243,6 @@ Section Monotonicity.
     {
       monotone := fun a => exists b, (HPB b).(monotone) a ;
       antitone := fun a => exists b, (HPB b).(antitone) a ;
-      is_monotone := _ ;
-      is_antitone := _ ;
-      complete_monotone_is_equivalent := _ ;
-      complete_antitone_is_equivalent := _
     }.
   Next Obligation.
     intros B HB P HPB a1 a2 Hprec [b HP]; simpl.
@@ -287,10 +265,6 @@ Section Monotonicity.
     {
       monotone := fun a => (HP.(monotone) a) /\ (HQ.(monotone) a) ;
       antitone := fun a => (HP.(antitone) a) /\ (HQ.(antitone) a) ;
-      is_monotone := _ ;
-      is_antitone := _ ;
-      complete_monotone_is_equivalent := _ ;
-      complete_antitone_is_equivalent := _
     }.
   Next Obligation.
     intros P Q HP HQ a1 a2 Hprec [HP1 HQ1]; simpl; split.
@@ -313,10 +287,6 @@ Section Monotonicity.
     {
       monotone := fun a => (HP.(monotone) a) \/ (HQ.(monotone) a) ;
       antitone := fun a => (HP.(antitone) a) \/ (HQ.(antitone) a) ;
-      is_monotone := _ ;
-      is_antitone := _ ;
-      complete_monotone_is_equivalent := _ ;
-      complete_antitone_is_equivalent := _
     }.
   Next Obligation.
     intros P Q HP HQ a1 a2 Hprec [HP1 | HQ1]; simpl.
@@ -343,10 +313,6 @@ Section Monotonicity.
     {
       monotone := fun a => HP.(antitone) a -> HQ.(monotone) a ;
       antitone := fun a => HP.(monotone) a -> HQ.(antitone) a ;
-      is_monotone := _ ;
-      is_antitone := _ ;
-      complete_monotone_is_equivalent := _ ;
-      complete_antitone_is_equivalent := _
     }.
   Next Obligation.
     simpl; intros P Q HP HQ a1 a2 Hprec ? Hanti.
@@ -379,10 +345,6 @@ Section Monotonicity.
    (g : A -> B) (Hcg : is_complete g) (b : B) (Hb : is_complete b) : Monotonizable (fun a => g a ⊑ b) := {
       monotone := fun a => b ⊑ g a ;
       antitone := fun a => g a ⊑ b ;
-      is_monotone := _ ;
-      is_antitone := _ ;
-      complete_monotone_is_equivalent := _ ;
-      complete_antitone_is_equivalent := _
     }.
   Next Obligation.
     intros ? ? ? ? ? g ? b ? a1 a2 Hprec ?; cbn. 
@@ -400,9 +362,6 @@ Section Monotonicity.
     - eapply is_right_reflexive; eauto.
     - apply Hcg; eauto.
     - eapply is_right_reflexive; eauto.
-  Qed.
-  Next Obligation.
-    intros B ? ? ? ? g ? ? ? a Hca; split; eauto.
   Qed.
 
 End Monotonicity.
