@@ -963,10 +963,8 @@ Ltac UseTransfer :=
 + (* dead instruction, turned into a nop *)
   econstructor; split. 
   eapply exec_Inop; eauto.
-  admit.
   eapply match_succ_states; eauto. simpl; auto.
   apply eagree_update_dead; auto with na.
-  admit.
 + (* instruction with needs = [I Int.zero], turned into a load immediate of zero. *)
   econstructor; split.
   eapply RTL_Incomplete.exec_Iop with (v := Vint Int.zero); eauto.
@@ -1594,12 +1592,6 @@ Section TRANSF_PROGRAM_CORRECT.
   Lemma senv_preserved': Senv.equiv ge tge.
   Proof (Genv.senv_match TRANSF).
 
-  Lemma list_forall2_map:  forall (A B C: Type) (P: A -> B -> Prop) (l1: list A) (l2: list C) f,
-  list_forall2 (fun x y => P x (f y)) l1 l2 -> list_forall2 P l1 (map f l2).
-  Proof.
-    intros until f. induction 1; subst; econstructor; eauto. 
-  Qed.
-
   Lemma state_to_RTL_Incomplete : forall s1 s2,
     match_states prog transf_function_complete transf_function_complete s1 s2 ->
     match_states prog transf_function transf_function s1 (map_state to_RTL_Incomplete_instruction s2).
@@ -1622,7 +1614,7 @@ Section TRANSF_PROGRAM_CORRECT.
       eapply transf_function_complete_to_RTL; eauto.
   Qed.
 
-    Lemma stakeframe_inversion s ts :
+  Lemma stakeframe_inversion s ts :
     gen_match_stackframes prog eq transf_function s ts ->
     exists ts', 
     gen_match_stackframes prog eq transf_function_complete s ts' /\
@@ -1664,6 +1656,89 @@ Section TRANSF_PROGRAM_CORRECT.
       exists (Returnstate s' tv tm). cbn; split; try econstructor; try f_equal; eauto.
   Qed. 
 
+  Lemma find_symbol_tprog' id 
+    (Linker := Linker_prog (AST.fundef (@function_ instruction)) unit): 
+    Genv.find_symbol (Genv.globalenv tprog') id = 
+    Genv.find_symbol (Genv.globalenv tprog) id.
+  Proof.
+    pose proof match_tprog'; pose proof match_prog_tprog'.
+    unfold match_prog, match_prog_aux, match_program in *. 
+    etransitivity.
+    - eapply Genv.find_symbol_match; eauto.
+    - symmetry. eapply Genv.find_symbol_match; eauto.
+  Qed.    
+
+  Lemma eval_operation_tprog' sp op rs args m: 
+    eval_operation (Genv.globalenv tprog') sp op rs ## args m = eval_operation (Genv.globalenv tprog) sp op rs ## args m.
+  Proof.
+    destruct op; cbn ; eauto. 
+    - destruct (_ ## _); f_equal. unfold Genv.symbol_address; now erewrite find_symbol_tprog'.
+    - destruct a; cbn; eauto. destruct (_ ## _); f_equal. unfold Genv.symbol_address; now erewrite find_symbol_tprog'.
+  Qed.
+
+  Lemma eval_addressing_tprog' sp addr rs args: 
+    eval_addressing (Genv.globalenv tprog') sp addr rs ## args = eval_addressing (Genv.globalenv tprog) sp addr rs ## args.
+  Proof.
+    unfold eval_addressing. destruct Archi.ptr64, addr; cbn; eauto.
+    destruct (_ ## _); f_equal. unfold Genv.symbol_address; now erewrite find_symbol_tprog'.
+  Qed. 
+
+  Lemma find_function_tprog' ros rs f
+    (Linker := Linker_prog (AST.fundef (@function_ instruction)) unit) :  
+    RTL_Incomplete.find_function (Genv.globalenv tprog') ros rs = Some (to_RTL_Incomplete_fundef f) ->
+    find_function (Genv.globalenv tprog) ros rs = Some f.
+  Proof.
+    destruct ros; intro H; cbn. 
+    (* - set (rs # r) in *. exploit Genv.find_funct_inv; eauto. intros [b EQ]. cbn -[tprog'] in H. rewrite EQ in H. cbn. rewrite EQ.
+      rewrite Genv.find_funct_find_funct_ptr in H.
+      rewrite Genv.find_funct_find_funct_ptr.
+      eapply Genv.find_funct_ptr_match in H. auto.
+      rewrite Genv.find_funct_find_funct_ptr in H. 
+      rewrite Genv.find_funct_find_funct_ptr in H. 
+      
+      eapply Genv.find_funct_ptr_inversion in H.
+      
+  
+    
+    eapply Genv.find_funct_match in H.  *)
+    Admitted.  
+
+  Lemma symbol_address_tprog' id ofs : 
+    Senv.symbol_address (Genv.globalenv tprog') id ofs = Senv.symbol_address (Genv.globalenv tprog) id ofs.
+  Proof.
+    unfold Senv.symbol_address. unfold Senv.find_symbol. cbn - [tprog']. 
+    rewrite find_symbol_tprog'; eauto.
+  Qed.   
+
+  Lemma eval_builtin_args_tprog' rs sp m args vargs : 
+    eval_builtin_args (Genv.globalenv tprog') (fun r : positive => rs # r) sp m args vargs ->
+    eval_builtin_args (Genv.globalenv tprog) (fun r : positive => rs # r) sp m args vargs.
+  Proof.
+    unfold eval_builtin_args. eapply list_forall2_impl; intros.
+    induction H; subst; try econstructor; eauto.
+    - now rewrite <- symbol_address_tprog'.
+    - rewrite symbol_address_tprog'. econstructor.
+  Qed. 
+
+  Lemma find_var_info_tprog' b : 
+    Genv.find_var_info (Genv.globalenv tprog') b = Genv.find_var_info (Genv.globalenv tprog) b.
+  Proof.
+    unfold Genv.find_var_info, Genv.find_def.
+  Admitted.
+
+  Lemma external_call_tprog' ef vargs m t vres m' : 
+    external_call ef (Genv.globalenv tprog') vargs m t vres m' ->
+    external_call ef (Genv.globalenv tprog) vargs m t vres m'.
+  Proof.
+    eapply external_call_symbols_preserved.
+    unfold Senv.equiv. repeat split; intros; eauto.
+    - unfold Senv.find_symbol. cbn - [tprog']. now rewrite find_symbol_tprog'.
+    - unfold Senv.public_symbol. cbn - [tprog']. unfold Genv.public_symbol. rewrite find_symbol_tprog'. 
+      destruct (Genv.find_symbol _ _); eauto. now repeat rewrite Genv.globalenv_public.
+    - unfold Senv.block_is_volatile. cbn. unfold Genv.block_is_volatile.
+      now rewrite find_var_info_tprog'.
+  Qed. 
+
   Lemma step_simul s s' t : RTL_Incomplete.step (Genv.globalenv (transform_program to_RTL_Incomplete_fundef tprog))
         (map_state to_RTL_Incomplete_instruction s) t
         (map_state to_RTL_Incomplete_instruction s') -> step (Genv.globalenv tprog) s t s'.
@@ -1679,19 +1754,19 @@ Section TRANSF_PROGRAM_CORRECT.
     apply stack_to_RTL_Incomplete_function_injective in H11; subst. 
     econstructor 2. cbn in H2. rewrite PTree.gmap in H2. unfold option_map in H2. destruct (_ ! _) ; inversion H2; f_equal; eauto. 
     destruct i; inversion H0; eauto.
-    admit. 
+    now rewrite <- eval_operation_tprog'. 
   + destruct s, s'; cbn in *; inversion H0; inversion H1; subst; clear H0 H1.
     apply to_RTL_Incomplete_function_injective in H13. 
     apply stack_to_RTL_Incomplete_function_injective in H12; subst. 
     econstructor 3; eauto. cbn in H2. rewrite PTree.gmap in H2. unfold option_map in H2. destruct (_ ! _) ; inversion H2; f_equal; eauto. 
     destruct i; inversion H0; eauto.
-    admit. 
+    now rewrite <- eval_addressing_tprog'. 
   + destruct s, s'; cbn in *; inversion H0; inversion H1; subst; clear H0 H1.
     apply to_RTL_Incomplete_function_injective in H13. 
     apply stack_to_RTL_Incomplete_function_injective in H12; subst. 
     econstructor 4; eauto. cbn in H2. rewrite PTree.gmap in H2. unfold option_map in H2. destruct (_ ! _) ; inversion H2; f_equal; eauto. 
     destruct i; inversion H0; eauto.
-    admit. 
+    now rewrite <- eval_addressing_tprog'. 
   + destruct s, s'; cbn in *; inversion H0; inversion H1; subst; clear H0 H1.
     destruct stack0; inversion H12. cbn in *.  
     apply stack_to_RTL_Incomplete_function_injective in H1; subst.
@@ -1701,18 +1776,18 @@ Section TRANSF_PROGRAM_CORRECT.
     now apply to_RTL_Incomplete_instruction_injective. } 
     subst. econstructor 5. cbn in H2. rewrite PTree.gmap in H2. unfold option_map in H2. destruct (_ ! _) ; inversion H2; f_equal; eauto. 
     destruct i; inversion H1; eauto. 
-    admit. destruct f1; cbn; eauto.
+    eapply find_function_tprog'; eauto. destruct f1; cbn; eauto.
   + destruct s, s'; cbn in *; inversion H0; inversion H1; subst; clear H0 H1.
     apply stack_to_RTL_Incomplete_function_injective in H13; subst.
     econstructor 6. cbn in H2. rewrite PTree.gmap in H2. unfold option_map in H2. destruct (_ ! _) ; inversion H2; f_equal; eauto. 
-    destruct i; inversion H0; eauto. 
-    admit. destruct f1; cbn; eauto. destruct f0; cbn in *; eauto. 
+    destruct i; inversion H0; eauto.
+    eapply find_function_tprog'; eauto. destruct f1; cbn; eauto. destruct f0; cbn in *; eauto. 
   + destruct s, s'; cbn in *; inversion H0; inversion H1; subst; clear H0 H1.
     apply to_RTL_Incomplete_function_injective in H13. 
     apply stack_to_RTL_Incomplete_function_injective in H12; subst.
     econstructor 7. cbn in H2. rewrite PTree.gmap in H2. unfold option_map in H2. destruct (_ ! _) ; inversion H2; f_equal; eauto. 
     destruct i; inversion H0; eauto. 
-    admit. admit. 
+    eapply eval_builtin_args_tprog'; eauto. eapply external_call_tprog'; eauto.
   + destruct s, s'; cbn in *; inversion H0; inversion H1; subst; clear H0 H1.
     apply to_RTL_Incomplete_function_injective in H13. 
     apply stack_to_RTL_Incomplete_function_injective in H12; subst.
@@ -1737,7 +1812,7 @@ Section TRANSF_PROGRAM_CORRECT.
   + destruct s, s'; cbn in *; inversion H0; inversion H1; subst; clear H0 H1.
     apply stack_to_RTL_Incomplete_function_injective in H8; subst.
     destruct f; cbn in H5; inversion H5; subst. 
-    econstructor 12; eauto. admit. 
+    econstructor 12; eauto. eapply external_call_tprog'; eauto.
   + destruct s, s'; cbn in *; inversion H3; inversion H1; subst; clear H1 H3.
     destruct stack; inversion H9. cbn in *.  
     apply stack_to_RTL_Incomplete_function_injective in H1; subst.
@@ -1746,7 +1821,7 @@ Section TRANSF_PROGRAM_CORRECT.
     repeat rewrite PTree.gmap in H5. unfold option_map in H5. repeat destruct (_ ! _); inversion H5; f_equal; eauto;
     now apply to_RTL_Incomplete_instruction_injective. } 
     subst. econstructor 13.
-  Admitted.  
+  Qed. 
   
 Lemma function_ptr_translated_complete :
   forall (b: block) (f: RTL.fundef),
@@ -1805,8 +1880,7 @@ Proof.
   intros. inv H0. inv H. inv STACKS. inv RES. constructor.
 Qed.
 
-
-  Theorem transf_program_correct:
+Theorem transf_program_correct:
     forward_simulation (RTL.semantics prog) (RTL.semantics tprog).
   Proof.
     intros. pose iscomplete_tprog'. apply forward_simulation_step with
