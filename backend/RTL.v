@@ -267,6 +267,65 @@ Definition map_state {A B} (f : A -> B) (s : @state_ A) : @state_ B :=
   | Returnstate stack v m => Returnstate (List.map (map_stackframe (map_function_ f)) stack) v m
   end.
 
+  Lemma map_function_compose {A B C} (f : A->B) (g : B -> C) a : 
+  map_function_ g (map_function_ f a) = 
+  map_function_ (fun x => g (f x)) a.
+Proof.
+  destruct a; unfold map_function_; f_equal; cbn.
+  eapply PTree.extensionality; intro p.
+  repeat rewrite PTree.gmap. unfold option_map. destruct (_ ! _); eauto.
+Qed.
+
+Lemma map_state_compose {A B C} (f : A->B) (g : B -> C) s : 
+  map_state g (map_state f s) = 
+  map_state (fun x => g (f x)) s.
+Proof.
+  destruct s; cbn; f_equal. 
+  - induction stack; cbn; f_equal; eauto. 
+    clear IHstack. destruct a; cbn; f_equal.   
+    eapply map_function_compose. 
+  - induction stack; cbn; f_equal; eauto.    
+    eapply map_function_compose. 
+  - induction stack; cbn; f_equal; eauto. 
+    clear IHstack. destruct a; cbn; f_equal.   
+    eapply map_function_compose.
+  - destruct f0; cbn; f_equal. eapply map_function_compose.
+  - induction stack; cbn; f_equal; eauto. 
+    clear IHstack. destruct a; cbn; f_equal.   
+    eapply map_function_compose.
+Qed.  
+
+
+Lemma map_state_ext {A B} (f g : A->B) s : 
+  (forall x, f x = g x) ->
+  map_state f s = map_state g s. 
+Proof.
+  intro Heq. destruct s; cbn; f_equal.
+  - induction stack; cbn; f_equal; eauto.
+    clear IHstack. destruct a; cbn; f_equal. 
+    destruct f1; unfold map_function_; f_equal; cbn.
+    eapply PTree.extensionality; intro p.
+    repeat rewrite PTree.gmap. unfold option_map. destruct (_ ! _); f_equal; eauto.
+  - destruct f0; unfold map_function_; f_equal; cbn.
+    eapply PTree.extensionality; intro p.
+    repeat rewrite PTree.gmap. unfold option_map. destruct (_ ! _); f_equal; eauto.
+  - induction stack; cbn; f_equal; eauto.
+    clear IHstack. destruct a; cbn; f_equal. 
+    destruct f1; unfold map_function_; f_equal; cbn.
+    eapply PTree.extensionality; intro p.
+    repeat rewrite PTree.gmap. unfold option_map. destruct (_ ! _); f_equal; eauto.
+  - destruct f0; cbn; f_equal.   
+    destruct f0; unfold map_function_; f_equal; cbn.
+    eapply PTree.extensionality; intro p.
+    repeat rewrite PTree.gmap. unfold option_map. destruct (_ ! _); f_equal; eauto.
+  - induction stack; cbn; f_equal; eauto.
+    clear IHstack. destruct a; cbn; f_equal. 
+    destruct f0; unfold map_function_; f_equal; cbn.
+    eapply PTree.extensionality; intro p.
+    repeat rewrite PTree.gmap. unfold option_map. destruct (_ ! _); f_equal; eauto.
+Qed. 
+ 
+
 
 (** The transitions are presented as an inductive predicate
   [step ge st1 t st2], where [ge] is the global environment,

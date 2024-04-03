@@ -1387,10 +1387,6 @@ Axiom (is_complete_transf_function : is_complete transf_function).
 
 Hint Resolve is_complete_transf_function : core.
 
-Definition to_RTL_Incomplete_function := map_function_ to_RTL_Incomplete_instruction.
-
-Definition to_RTL_Incomplete_fundef :=  AST.transf_fundef to_RTL_Incomplete_function.
-
 Lemma is_complete_to_RTL_Incomplete_fundef f : is_complete (to_RTL_Incomplete_fundef f).
 Proof.
   destruct f; red; cbn.
@@ -1403,7 +1399,12 @@ Proof.
   - destruct e; eauto.    
 Qed. 
 
-Axiom todo : forall A, A. 
+Lemma Tree_map_node (A B : Type) (f : A -> B) (l r : PTree.tree A) o : 
+  PTree.map (fun _ => f) (PTree.Node l o r) = PTree.Node (PTree.map (fun _ => f) l) (option_map f o) (PTree.map (fun _ => f) r).
+Proof.
+  eapply PTree.extensionality; intro p.
+  rewrite PTree.gmap; repeat rewrite PTree.gNode. destruct p; repeat rewrite PTree.gmap; unfold option_map; try destruct (_ ! _); eauto.
+Qed. 
 
 Definition to_RTL_code (f : RTL_Incomplete.code) (Hfcomplete : is_complete f): 
   { ff : RTL.code | PTree.map (fun _ => to_RTL_Incomplete_instruction) ff = f}.
@@ -1414,15 +1415,18 @@ Proof.
   - intro Hfcomplete. unshelve eexists (PTree.Node _ _ _). 
     * apply IHf. intros. specialize (Hfcomplete (xO pc)).
       rewrite PTree.gNode in Hfcomplete. eauto.
-    * specialize (Hfcomplete xH).
+    * destruct o; [| exact None].
+      refine (Some _).
+      eapply (to_RTL_instruction i). 
+      unfold_complete in Hfcomplete. specialize (Hfcomplete xH).
       rewrite PTree.gNode in Hfcomplete. unfold_complete in Hfcomplete.
-      destruct o.
-      + refine (Some _). eapply (to_RTL_instruction i). unfold_complete in Hfcomplete.
-      inversion Hfcomplete; intro; try discriminate.
-      + exact None.
+      inversion Hfcomplete; intro; try discriminate.      
     * apply IHf0. intros. specialize (Hfcomplete (xI pc)).
       rewrite PTree.gNode in Hfcomplete. eauto.
-    * apply todo.  
+    * rewrite Tree_map_node. cbn. f_equal.
+      + destruct IHf; eauto.   
+      + destruct o; cbn; eauto. f_equal. cbn in H. eapply to_RTL_Incomplete_instruction_retract.
+      + destruct IHf0; eauto.   
 Qed.
 
 Program Definition to_RTL_function (f : RTL_Incomplete.function) (Hfcomplete : is_complete f): 
@@ -1466,63 +1470,6 @@ Qed.
 
 Definition transf_stack_complete r s := map_state (transf_function_complete r) s.
 
-Lemma map_function_compose {A B C} (f : A->B) (g : B -> C) a : 
-  map_function_ g (map_function_ f a) = 
-  map_function_ (fun x => g (f x)) a.
-Proof.
-  destruct a; unfold map_function_; f_equal; cbn.
-  eapply PTree.extensionality; intro p.
-  repeat rewrite PTree.gmap. unfold option_map. destruct (_ ! _); eauto.
-Qed.
-
-Lemma map_state_compose {A B C} (f : A->B) (g : B -> C) s : 
-  map_state g (map_state f s) = 
-  map_state (fun x => g (f x)) s.
-Proof.
-  destruct s; cbn; f_equal. 
-  - induction stack; cbn; f_equal; eauto. 
-    clear IHstack. destruct a; cbn; f_equal.   
-    eapply map_function_compose. 
-  - induction stack; cbn; f_equal; eauto.    
-    eapply map_function_compose. 
-  - induction stack; cbn; f_equal; eauto. 
-    clear IHstack. destruct a; cbn; f_equal.   
-    eapply map_function_compose.
-  - destruct f0; cbn; f_equal. eapply map_function_compose.
-  - induction stack; cbn; f_equal; eauto. 
-    clear IHstack. destruct a; cbn; f_equal.   
-    eapply map_function_compose.
-Qed.  
-
-Lemma map_state_ext {A B} (f g : A->B) s : 
-  (forall x, f x = g x) ->
-  map_state f s = map_state g s. 
-Proof.
-  intro Heq. destruct s; cbn; f_equal.
-  - induction stack; cbn; f_equal; eauto.
-    clear IHstack. destruct a; cbn; f_equal. 
-    destruct f1; unfold map_function_; f_equal; cbn.
-    eapply PTree.extensionality; intro p.
-    repeat rewrite PTree.gmap. unfold option_map. destruct (_ ! _); f_equal; eauto.
-  - destruct f0; unfold map_function_; f_equal; cbn.
-    eapply PTree.extensionality; intro p.
-    repeat rewrite PTree.gmap. unfold option_map. destruct (_ ! _); f_equal; eauto.
-  - induction stack; cbn; f_equal; eauto.
-    clear IHstack. destruct a; cbn; f_equal. 
-    destruct f1; unfold map_function_; f_equal; cbn.
-    eapply PTree.extensionality; intro p.
-    repeat rewrite PTree.gmap. unfold option_map. destruct (_ ! _); f_equal; eauto.
-  - destruct f0; cbn; f_equal.   
-    destruct f0; unfold map_function_; f_equal; cbn.
-    eapply PTree.extensionality; intro p.
-    repeat rewrite PTree.gmap. unfold option_map. destruct (_ ! _); f_equal; eauto.
-  - induction stack; cbn; f_equal; eauto.
-    clear IHstack. destruct a; cbn; f_equal. 
-    destruct f0; unfold map_function_; f_equal; cbn.
-    eapply PTree.extensionality; intro p.
-    repeat rewrite PTree.gmap. unfold option_map. destruct (_ ! _); f_equal; eauto.
-Qed. 
- 
 Lemma transf_stack_complete_spec r s : 
   map_state (bind_pure to_RTL_Incomplete_function) (transf_stack_complete r s) = 
   map_state (transf_function r) s.
@@ -1531,30 +1478,6 @@ Proof.
   eapply map_state_ext, transf_function_complete_spec.
 Qed. 
 
-Lemma to_RTL_Incomplete_instruction_injective i i': to_RTL_Incomplete_instruction i = to_RTL_Incomplete_instruction i' -> i = i'. 
-Proof.
-  destruct i, i'; cbn; inversion 1; f_equal; eauto.
-Qed.    
-
-Lemma to_RTL_Incomplete_function_injective f f' : to_RTL_Incomplete_function f = to_RTL_Incomplete_function f' -> f = f'.
-Proof.
-  destruct f, f'; unfold to_RTL_Incomplete_function, map_function_; cbn; inversion 1; f_equal; cbn.
-  eapply PTree.extensionality; intro p. eapply (f_equal (fun f => f ! p)) in H4.
-  repeat rewrite PTree.gmap in H4. unfold option_map in H4. repeat destruct (_ ! _); inversion H4; f_equal; eauto.
-  now apply to_RTL_Incomplete_instruction_injective.
-Qed.         
-
-Lemma stackframe_to_RTL_Incomplete_function_injective s s' : map_stackframe to_RTL_Incomplete_function s = map_stackframe to_RTL_Incomplete_function s' -> s = s'.
-Proof.
-  destruct s, s'; cbn. inversion 1. f_equal; subst. eapply to_RTL_Incomplete_function_injective; eauto.
-  unfold to_RTL_Incomplete_function, map_function_; cbn; f_equal; eauto.
-Qed.
-
-Lemma stack_to_RTL_Incomplete_function_injective s s' : map (map_stackframe to_RTL_Incomplete_function) s = map (map_stackframe to_RTL_Incomplete_function) s' -> s = s'.
-Proof.
-  revert s'; induction s; destruct s'; inversion 1; f_equal; eauto.
-  eapply stackframe_to_RTL_Incomplete_function_injective; eauto.
-Qed. 
 
 Lemma transf_function_complete_to_RTL r f tf : 
   transf_function_complete r f = OK tf -> 
