@@ -491,6 +491,14 @@ Proof.
   now apply to_RTL_Incomplete_instruction_injective.
 Qed.         
 
+Lemma to_RTL_Incomplete_fundef_injective f f' : to_RTL_Incomplete_fundef f = to_RTL_Incomplete_fundef f' -> f = f'.
+Proof.
+  destruct f, f'; try solve [inversion 1]. cbn.
+  - intro. f_equal. eapply to_RTL_Incomplete_function_injective. set (to_RTL_Incomplete_function f) in *. set (to_RTL_Incomplete_function f0) in *.
+    clearbody f1 f2. inversion H; eauto.
+  - cbn. intro X. inversion X. subst. reflexivity.
+Qed.
+
 Lemma stackframe_to_RTL_Incomplete_function_injective s s' : map_stackframe to_RTL_Incomplete_function s = map_stackframe to_RTL_Incomplete_function s' -> s = s'.
 Proof.
   destruct s, s'; cbn. inversion 1. f_equal; subst. eapply to_RTL_Incomplete_function_injective; eauto.
