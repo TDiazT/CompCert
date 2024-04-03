@@ -2090,10 +2090,19 @@ Axiom (is_complete_transf_function : is_complete transf_function).
 
 Hint Resolve is_complete_transf_function : core.
 
-Definition map_function_ {A B} (f : A -> B) (fn : @function_ A) : @function_ B :=
-  (mkfunction (fn_sig fn) (fn_params fn) (fn_stacksize fn) (PTree.map (fun _ => f ) (fn_code fn)) (fn_entrypoint fn)).
-
 Definition to_RTL_Incomplete_function :=  AST.transf_fundef (map_function_ to_RTL_Incomplete_instruction).
+
+Lemma is_complete_to_RTL_Incomplete_function f : is_complete (to_RTL_Incomplete_function f).
+Proof.
+  destruct f; red; cbn.
+  - red; cbn. repeat split. induction (fn_params f); red; cbn; eauto.
+    red; cbn. intro. rewrite PTree.gmap. unfold option_map.
+    destruct (_ ! _); red; cbn; eauto. destruct i; econstructor; eauto.
+    all: try induction l; red; cbn; eauto.
+    1-2: destruct s0; red; cbn ;eauto.
+    destruct o; eauto.   
+  - destruct e; eauto.    
+Qed. 
 
 Axiom todo : forall A, A. 
 Definition to_RTL_code (f : RTL_Incomplete.code) (Hfcomplete : is_complete f): 
@@ -2142,6 +2151,18 @@ Next Obligation.
   unfold_complete in H0. destruct H0; eauto.
 Defined.
 
+Lemma transf_function_complete_spec r f : 
+  match transf_function_complete r f with 
+    OK tf => OK (map_function_ to_RTL_Incomplete_instruction tf)
+    | Error e => Error e 
+  end = transf_function r f.
+Proof.
+  unfold transf_function_complete, transf_function_complete_obligation_1.
+  set is_complete_transf_function. destruct i. destruct i.
+  set (i0 _ _). clearbody i1. set (transf_function r f) in *. destruct r2; eauto.
+  f_equal. destruct f0. destruct to_RTL_function; eauto. 
+Qed. 
+
 (* Defined so Compiler.v works, fixing the transf_f function to the concrete one  *)
 Definition match_prog (prog : program) (tprog: program) :=
   match_prog_aux transf_function_complete prog tprog.
@@ -2160,18 +2181,6 @@ Section TRANSF_PROGRAM_CORRECT.
     eapply match_transform_program.
   Qed.  
 
-  Lemma is_complete_to_RTL_Incomplete_function f : is_complete (to_RTL_Incomplete_function f).
-  Proof.
-    destruct f; red; cbn.
-    - red; cbn. repeat split. induction (fn_params f); red; cbn; eauto.
-      red; cbn. intro. rewrite PTree.gmap. unfold option_map.
-      destruct (_ ! _); red; cbn; eauto. destruct i; econstructor; eauto.
-      all: try induction l; red; cbn; eauto.
-      1-2: destruct s0; red; cbn ;eauto.
-      destruct o; eauto.   
-    - destruct e; eauto.    
-  Qed. 
-
   Lemma find_funct_ptr_tprog' b : match Genv.find_funct_ptr (Genv.globalenv tprog') b with
   | Some x => is_complete x
   | None => True
@@ -2184,8 +2193,7 @@ Section TRANSF_PROGRAM_CORRECT.
   destruct g; inversion H; subst. eapply is_complete_to_RTL_Incomplete_function.
   Qed. 
 
-  Lemma iscomplete_tprog' : 
-    is_complete tprog'.
+  Lemma iscomplete_tprog' : is_complete tprog'.
   Proof.
     split; intros; red; cbn -[Genv.globalenv].
     - destruct ros;  cbn -[Genv.globalenv].
@@ -2223,18 +2231,6 @@ Section TRANSF_PROGRAM_CORRECT.
       + inversion H2. 
   Qed. 
 
-  Definition map_stackframe {A B} (f : A -> B) (sf : @stackframe A) : @stackframe B :=
-    match sf with
-    | Stackframe rs fn v n r => Stackframe rs (map_function_ f fn) v n r
-    end.
-
-  Definition map_state {A B} (f : A -> B) (s : @state_ A) : @state_ B :=
-    match s with 
-    | State stack fn v n r m => State (List.map (map_stackframe f) stack) (map_function_ f fn) v n r m
-    | Callstate stack fn vl m => Callstate (List.map (map_stackframe f) stack) (AST.transf_fundef (map_function_ f) fn) vl m
-    | Returnstate stack v m => Returnstate (List.map (map_stackframe f) stack) v m
-    end.
-
   Lemma senv_preserved':
     Senv.equiv ge tge.
   Proof (Genv.senv_match TRANSF).
@@ -2243,8 +2239,17 @@ Section TRANSF_PROGRAM_CORRECT.
     match_states prog transf_function transf_function s1 st2 -> 
     exists s2', map_state to_RTL_Incomplete_instruction s2' = st2.
   Proof. 
-    intros. inversion H.
-    eexists (State s () (Vptr sp Ptrofs.zero) pc te tm). cbn. 
+    intros. inversion H. 
+    - pose proof (transf_function_complete_spec (romem_for cu) f).
+      set (tf':= transf_function_complete (romem_for cu) f) in *.
+      unfold transf_function_complete, transf_function_complete_obligation_1 in *.
+      set is_complete_transf_function in *. destruct i. destruct i.
+      set (i0 _ _) in *. clearbody i1. set (transf_function (romem_for cu) f) in *. destruct r1; inversion FUN; subst; clear FUN.
+      unfold tf' in H2; clear tf'; set (tf' := proj1_sig _) in *. 
+      exists (State s tf' (Vptr sp Ptrofs.zero) pc te tm). cbn.
+      admit.  
+    - 
+
     f_equal.
     - clear - STACKS. induction STACKS; cbn; f_equal; eauto.
       clear -H. inversion H. cbn. f_equal; eauto.
