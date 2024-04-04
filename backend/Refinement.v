@@ -38,23 +38,30 @@ Arguments refinement : simpl never.
 
 #[export] Instance refinableTransitive {A} `{Refinable A} : Transitive refinement := { transitivity := is_transitive }.
 
-#[export, refine] Instance refinableFun {A B} `{Refinable A} `{Refinable B} : Refinable (A -> B) :=
+#[export] Program Instance refinableFun {A B} `{Refinable A} `{Refinable B} : Refinable (A -> B) :=
   {
-    refinement f g := forall a1 a2, a1 ⊑ a2 -> f a1 ⊑ g a2 /\ f a1 ⊑ f a2 /\ g a1 ⊑ g a2 ;
+    refinement f g := (forall a1 a2, a1 ⊑ a2 -> f a1 ⊑ g a2) /\ (forall a1 a2, a1 ⊑ a2 -> g a1 ⊑ g a2) ;
   }.
-Proof.
-  - intros f g h Hmono1 Hmono2 a1 a2 Hprec; split.
-    edestruct Hmono1; eauto. 
-    etransitivity; [ apply H1 | apply Hmono2]. eapply is_right_reflexive in Hprec; eauto.
-    split. edestruct Hmono1; clear_ctx; eauto.
-    edestruct Hmono2; clear_ctx; eauto.
-  - intros f g Hfg a a' Hprec. repeat split; edestruct Hfg; eauto; destruct H2; eauto.
-Defined.
+Next Obligation. 
+  intros. intros f g h Hmono1 Hmono2; split; intros a1 a2 Hprec.
+  edestruct Hmono1; eauto. 
+  etransitivity; [ apply H1; eauto | apply Hmono2]. eapply is_right_reflexive in Hprec; eauto.
+  edestruct Hmono2; clear_ctx; eauto.
+Qed.
+Next Obligation.  
+  firstorder.
+Qed.
 
 Definition sp_fun {A B} `{Refinable A} `{Refinable B} (f : A -> B): (forall a1 a2, a1 ⊑ a2 -> f a1 ⊑ f a2) -> f ⊑ f.
 Proof.
   intros; repeat split; eauto.
 Qed.
+
+#[export] Program Instance refinableProp : Refinable Prop :=
+  {
+    refinement P Q := P -> Q
+  }.
+Solve All Obligations with firstorder.
 
 Class Complete (A : Type) `{Refinable A} :=
   {
@@ -64,17 +71,15 @@ Class Complete (A : Type) `{Refinable A} :=
 
 Arguments is_complete : simpl never.
 
-#[export, refine] Instance completeFun {A B} `{Complete A} `{Complete B} : Complete (A -> B) :=
+#[export] Program Instance completeFun {A B} `{Complete A} `{Complete B} : Complete (A -> B) :=
   {
     is_complete f := f ⊑ f /\ forall a, is_complete a -> is_complete (f a) ;
     is_complete_spec := _;
   }.
-Proof.
-  cbn. intros f [Hf Hcompl] a1 a2 ?; eauto.
-Defined.
+Solve All Obligations with firstorder.
 
 Lemma is_complete_const_fun : forall {A B} `{Complete A} `{Complete B} (b : B), is_complete b -> is_complete (fun _ : A => b).
-Proof.  simpl; intros. split.
+Proof.  simpl; intros. red; cbn.   split.
   - unfold refinement; cbn. eapply is_complete_spec in H3; eauto.
   - eauto.
 Qed.
@@ -101,8 +106,8 @@ Section Monotonicity.
     {
       monotone : A -> Prop;
       antitone : A -> Prop;
-      is_monotone : forall a1 a2, a1 ⊑ a2 -> monotone a1 -> monotone a2;
-      is_antitone : forall a1 a2, a1 ⊑ a2 -> antitone a2 -> antitone a1;
+      is_monotone : forall a1 a2, a1 ⊑ a2 -> monotone a1 ⊑ monotone a2;
+      is_antitone : forall a1 a2, a1 ⊑ a2 -> antitone a2 ⊑ antitone a1;
       complete_monotone_is_equivalent : forall (a : A), is_complete a -> monotone a <-> P a;
       complete_antitone_is_equivalent : forall (a : A), is_complete a -> antitone a <-> P a
     }.
@@ -175,7 +180,7 @@ Section Monotonicity.
   Qed.
   Next Obligation.
   intros ? ? ? ? ? g [Hcg ?] b a1 a2 Hprec [? ?].
-  unfold_refinement in Hcg. edestruct Hcg as [Hmono ?]; eauto. apply is_complete_minimal in Hmono; eauto.
+  unfold_refinement in Hcg. edestruct Hcg as [Hmono ?]; eauto. eapply is_complete_minimal in Hmono; eauto.
   rewrite Hmono; eauto.
   Qed.
   Next Obligation.
@@ -373,7 +378,7 @@ Lemma fun_is_complete_if_complete_dom : forall {A B} `{Complete A} `{Complete B}
     forall a, is_complete a -> is_complete (fun f : A -> B => f a).
 Proof.
   simpl; intros; split.
-  - unfold refinement; cbn. intros. edestruct H4; eauto. eapply is_complete_spec in H3; eauto.
+  - unfold refinement; cbn. split; intros; edestruct H4; eauto; eapply is_complete_spec in H3; eauto.
   - intros. destruct H4. eauto.
 Qed.
 
