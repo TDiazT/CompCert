@@ -516,10 +516,12 @@ Proof.
     apply Hprec; eauto.
     apply romem_sp.
   - intros tf tf' Hprec MS; inv MS; econstructor; eauto. 
-    destruct FUN. unfold_refinement in Hprec; edestruct (Hprec _ _ (romem_sp (romem_for cu))) as [Hprec' ?]; eauto.
-    unfold_refinement in Hprec'. edestruct (Hprec' f) as [Hprec'' ?]. 
-    * reflexivity.
-    * apply is_complete_minimal in Hprec''; eauto. rewrite Hprec''. rewrite <- H0. eauto.
+    destruct FUN. 
+    unfold_refinement in Hprec. destruct Hprec as [Hprec' ?].  
+    specialize (Hprec' _ _ (romem_sp (romem_for cu))).
+    unfold_refinement in Hprec'. destruct Hprec' as [Hprec'' ?].
+    specialize (Hprec'' f f eq_refl). 
+    eapply is_complete_minimal in Hprec''; eauto. rewrite Hprec''. rewrite <- H0. eauto.
 
   - intros tf ?; split.
     * intros MS; inv MS; econstructor; eauto. symmetry. apply is_complete_minimal; eauto. apply H; eauto.
@@ -629,10 +631,11 @@ Lemma gen_match_stackframes_monotone_complete :
   forall {tf tf' S1 S2}, tf ⊑ tf' -> gen_match_stackframes (fun x y => is_complete x /\ x = y) tf' S1 S2 -> gen_match_stackframes (fun x y => is_complete x /\ x = y) tf S1 S2.
 Proof.
   intros. inv H0. econstructor; eauto. destruct_ctx.
-  unfold_refinement in H. 
-  specialize (H _ _ (romem_sp (romem_for cu))); destruct_ctx.
-  unfold_refinement in H0. specialize (H0 _ _ (reflRefinableEq f)). destruct_ctx.
-  apply is_complete_minimal in H1; eauto. rewrite H1; eauto.
+  unfold_refinement in H. destruct_ctx.
+  specialize (H0 _ _ (romem_sp (romem_for cu))); destruct_ctx.
+  unfold_refinement in H0. destruct H0 as [H0 ?]. 
+  specialize (H0 _ _ (reflRefinableEq f)). destruct_ctx.
+  apply is_complete_minimal in H0; eauto. rewrite H0; eauto.
 Qed.
 
 Lemma gen_match_stackframes_complete_monotone :
@@ -656,9 +659,11 @@ Proof.
 
   - intros tf tf' Hprec MS; inv MS; econstructor; eauto.
     * unshelve eapply (list_forall2_impl _ STACKS). intros ? ? Hgms; unshelve eapply (gen_match_stackframes_monotone_complete _ Hgms); eauto.
-    * unfold_refinement in Hprec. specialize (Hprec _ _ (romem_sp (romem_for cu))); destruct_ctx.
-      unfold_refinement in Hprec0; specialize (Hprec0 _ _ (reflRefinableEq f)); destruct_ctx.
-      rewrite <- FUN1. eapply is_complete_minimal in Hprec1; eauto. rewrite Hprec1; eauto.
+    * unfold_refinement in Hprec. destruct Hprec as [Hprec ?]. 
+      specialize (Hprec _ _ (romem_sp (romem_for cu))); destruct_ctx.
+      unfold_refinement in Hprec; destruct Hprec as [Hprec ?].
+      specialize (Hprec _ _ (reflRefinableEq f)); destruct_ctx.
+      rewrite <- FUN1. eapply is_complete_minimal in Hprec; eauto. rewrite Hprec; eauto.
     * unshelve eapply (list_forall2_impl _ STACKS). intros ? ? Hgms; unshelve eapply (gen_match_stackframes_monotone_complete _ Hgms); eauto.
     * unshelve eapply (list_forall2_impl _ STACKS). intros ? ? Hgms; unshelve eapply (gen_match_stackframes_monotone_complete _ Hgms); eauto.
 
@@ -728,7 +733,7 @@ Proof.
   - intros; apply H; try apply romem_complete; eauto.
 Defined.
 
-Lemma match_succ_states : monotonize (match_succ_states_stm transf_function) transf_function.
+Lemma match_succ_states : monotone (match_succ_states_stm transf_function) transf_function.
 Proof.
   simpl.
   intros s f sp pc e m ts tf te tm an pc' cu instr ne nm LINK STACKS FUN ANL INSTR SUCC ANPC ENV MEM.
@@ -913,7 +918,7 @@ Definition step_simulation_stm (transf_f : romem -> function -> res RTL_Incomple
   forall S1', match_states transf_function transf_f S1 S1' -> sound_state prog S1 ->
   exists S2', RTL_Incomplete.step tge S1' t S2' /\ match_states transf_function transf_f S2 S2'.
 
-Lemma tolerant_step_simulation : monotonize step_simulation_stm transf_function.
+Lemma tolerant_step_simulation : monotone step_simulation_stm transf_function.
 Proof. 
   simpl.
 Ltac TransfInstr :=
@@ -1463,7 +1468,7 @@ Proof.
   unfold bind_pure, bind, transf_function_complete, transf_function_complete_obligation_1. 
   set is_complete_transf_function. destruct i. destruct i.
   set (i0 _ _). clearbody i1. set (transf_function r f) in *. destruct r2; eauto.
-  f_equal. destruct f0. destruct to_RTL_function; eauto. 
+  f_equal. destruct f0. destruct to_RTL_function; eauto.
 Qed. 
 
 Definition transf_stack_complete r s := map_state (transf_function_complete r) s.
