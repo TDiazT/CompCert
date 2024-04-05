@@ -141,14 +141,6 @@ Section Monotonicity.
   Arguments monotone P {Monotonizable} a. 
   Arguments antitone P {Monotonizable} a. 
 
-  Corollary incompleteness_tolerance : forall (P : A -> Prop) {HP: Monotonizable P} (a1 a2 : A),
-    is_complete a1 -> a1 ⊑ a2 -> P a1 -> monotone P a2.
-  Proof.
-    intros P HP a1 a2 Hac Hprec HP1.
-    eapply HP.(is_monotone); try eapply Hprec; eauto.
-    apply HP.(complete_monotone_is_equivalent); eauto.
-  Qed.
-
   Obligation Tactic :=  try now intuition.
 
   #[export] Program Instance monotonizable_const (P : Prop) : Monotonizable (fun a => P) := {
