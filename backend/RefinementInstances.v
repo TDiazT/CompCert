@@ -29,31 +29,6 @@ Ltac destruct_ctx :=
   end
   ).
 
-
-(* Makes refinable instances where the refinement relation is equality. *)
-Definition mkEqRefinable (A : Type) : Refinable A :=
- {|
-  refinement (x y : A) := x = y ;
-  is_transitive := ltac:(unfold Relation_Definitions.transitive; try induction x; eauto; intros; subst; eauto);
-  is_right_reflexive := ltac:(simpl; eauto) ;
-  |}.
-
-  
-(* Makes complete instances where the complete predicate is always true. 
-  The premise is just to reuse the definition for other types with eq refinement.
-*)
-Program Definition mkCompleteTrue (A : Type) (refEqA := mkEqRefinable A) : Complete A :=
-  {|
-    is_complete _:= True ;
-    is_complete_spec := _
-  |}.
-Next Obligation. reflexivity. Qed.
-
-Program Instance mkGroundTrue (A : Type) (refEqA := mkEqRefinable A) (compA := mkCompleteTrue A) : Ground A :=
-  {|
-    is_complete_minimal := _
-  |}.
-
 Lemma reflRefinableEq {A} (HRA := mkEqRefinable A) : forall a : A, a ⊑ a.
 Proof. reflexivity. Qed.
 
@@ -213,10 +188,11 @@ Proof. constructor; intros [] [] [] []; f_equal; eapply is_complete_minimal; eau
 Defined. 
 
 Arguments monotone {A} {H} {HAC} P {Monotonizable}.
-#[export, refine] Instance monoForall2 {A B C} `{Complete C} (l1 : list A) (l2 : list B) (f : C -> A -> B -> Prop) {Hf : forall a b, Monotonizable (fun c => f c a b)} : Monotonizable (fun c => list_forall2 (f c) l1 l2) := 
+#[export, refine] Instance monoForall2 {A B C} `{Complete C} (l1 : list A) (l2 : list B) (f : C -> A -> B -> Prop) 
+  {Hf : forall a b, Monotonizable (fun c => f c a b)} : Monotonizable (fun c => list_forall2 (f c) l1 l2) := 
 {
-  monotone := fun c => list_forall2 (fun a b => (Hf a b).(monotone (fun c => f c a b)) c) l1 l2;
-  antitone := fun c => list_forall2 (fun a b => (Hf a b).(antitone) c) l1 l2;
+  monotone := fun c => list_forall2 (fun a b => monotone (fun c => f c a b) c) l1 l2;
+  antitone := fun c => list_forall2 (fun a b => antitone (fun c => f c a b) c) l1 l2;
 }.
 Proof.
   - intros ? ? ?; induction 1; constructor; eauto. eapply is_monotone; eauto.
