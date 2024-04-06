@@ -85,7 +85,7 @@ let static_called_once id io =
 
 (* To be considered: heuristics based on size of function? *)
 
-let should_inline (io: inlining_info) (id: ident) (f: coq_function) =
+let should_inline (io: inlining_info) (id: ident) (f: instruction function_) =
   if !Clflags.option_finline then begin
     match C2C.atom_inline id with
     | C2C.Inline -> true
