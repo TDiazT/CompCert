@@ -1676,18 +1676,15 @@ Section TRANSF_PROGRAM_CORRECT.
   Lemma eval_operation_tprog' sp op rs args m: 
     eval_operation (Genv.globalenv tprog') sp op rs ## args m = eval_operation (Genv.globalenv tprog) sp op rs ## args m.
   Proof.
-    destruct op; cbn ; eauto. 
-    - destruct (_ ## _); f_equal. unfold Genv.symbol_address; now erewrite find_symbol_tprog'.
-    - destruct a; cbn; eauto. destruct (_ ## _); f_equal. unfold Genv.symbol_address; now erewrite find_symbol_tprog'.
+    eapply eval_operation_preserved. apply find_symbol_tprog'.
   Qed.
 
   Lemma eval_addressing_tprog' sp addr rs args: 
     eval_addressing (Genv.globalenv tprog') sp addr rs ## args = eval_addressing (Genv.globalenv tprog) sp addr rs ## args.
   Proof.
-    unfold eval_addressing. destruct Archi.ptr64, addr; cbn; eauto.
-    destruct (_ ## _); f_equal. unfold Genv.symbol_address; now erewrite find_symbol_tprog'.
-  Qed. 
-
+    eapply eval_addressing_preserved. apply find_symbol_tprog'.
+  Qed.
+  
   Lemma find_function_tprog' ros rs f
     (Linker := Linker_prog (AST.fundef (@function_ instruction)) unit) :  
     RTL_Incomplete.find_function (Genv.globalenv tprog') ros rs = Some (to_RTL_Incomplete_fundef f) ->
