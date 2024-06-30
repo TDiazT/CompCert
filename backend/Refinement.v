@@ -1,139 +1,149 @@
 Require Import Coq.Relations.Relation_Definitions RelationClasses.
-
-Ltac clear_ctx :=
-  repeat (match goal with
-          | [H : _ \/ _ |- _ ] => 
-            let Hl := fresh H in 
-            let Hr := fresh H in
-            destruct H as [Hl | Hr]
-          | [H : _ /\ _ |- _ ] => 
-            let Hl := fresh H in 
-            let Hr := fresh H in
-            destruct H as [Hl Hr]
-          | [H : _ <-> _ |- _ ] => 
-            let Hl := fresh H in 
-            let Hr := fresh H in
-            destruct H as [Hl Hr]
-          | [H : exists (x : _), _ |- _ ] =>
-            let x := fresh x in
-            destruct H as [x H]
-          | [H : ?P , H2 : ?P |- _ ] => clear H2
-          | [H : (?a && ?b)%bool = true |- _] =>
-          apply andb_prop in H
-          end
-          ).
+From Coq Require Import FunctionalExtensionality.
 
 #[local] Obligation Tactic := idtac.
 
+(***********************************)
+(*          Refinable              *)
+(***********************************)
 Class Refinable (A : Type) : Type :=
   {
     refinement : relation A ;
     is_transitive : transitive A refinement;
-    is_right_reflexive : forall a1 a2, refinement a1 a2 -> refinement a2 a2
+    is_reflexive : reflexive A refinement
   }.
 
 Infix "⊑" := refinement (at level 70).
 
 Arguments refinement : simpl never.
 
-#[export] Instance refinableTransitive {A} `{Refinable A} : Transitive refinement := { transitivity := is_transitive }.
+Tactic Notation "unfold_refinement" := unfold refinement; cbn.
+Tactic Notation "unfold_refinement" "in" hyp(H) := unfold refinement in H; cbn in H.
 
-#[export] Program Instance refinableFun {A B} `{Refinable A} `{Refinable B} : Refinable (A -> B) :=
+#[export] 
+Instance refinableTransitive {A} `{Refinable A} : Transitive refinement := { transitivity := is_transitive }.
+#[export] 
+Instance refinableReflexive {A} `{Refinable A} : Reflexive refinement := { reflexivity := is_reflexive }.
+
+#[export] 
+Program Instance refinableFun {A B} `{Refinable A} `{Refinable B} : Refinable (A -> B) :=
   {
-    refinement f g := (forall a1 a2, a1 ⊑ a2 -> f a1 ⊑ g a2) /\ (forall a1 a2, a1 ⊑ a2 -> g a1 ⊑ g a2) ;
+    refinement f g := forall a, f a ⊑ g a ;
   }.
 Next Obligation. 
-  intros. intros f g h Hmono1 Hmono2; split; intros a1 a2 Hprec.
-  edestruct Hmono1; eauto. 
-  etransitivity; [ apply H1; eauto | apply Hmono2]. eapply is_right_reflexive in Hprec; eauto.
-  edestruct Hmono2; clear_ctx; eauto.
+  red; intros; etransitivity; eauto. 
 Qed.
-Next Obligation.  
-  firstorder.
+Next Obligation.
+  red; intros; reflexivity. 
 Qed.
 
-Definition sp_fun {A B} `{Refinable A} `{Refinable B} (f : A -> B): (forall a1 a2, a1 ⊑ a2 -> f a1 ⊑ f a2) -> f ⊑ f.
+(***********************************)
+(*          Monotonous             *)
+(***********************************)
+Definition is_monotonous {A B} `{Refinable A} `{Refinable B} (f : A -> B) := 
+    forall a1 a2, a1 ⊑ a2 -> f a1 ⊑ f a2.
+
+Lemma fun_is_monotonous : forall {A B} `{Refinable A} `{Refinable B},
+    forall a, is_monotonous (fun f : A -> B => f a).
 Proof.
-  intros; repeat split; eauto.
+  red; simpl; intros; eauto.
 Qed.
 
-#[export] Program Instance refinableProp : Refinable Prop :=
-  {
-    refinement P Q := P -> Q
-  }.
-Solve All Obligations with firstorder.
+Existing Class is_monotonous.
 
-Class Complete (A : Type) `{Refinable A} :=
+#[export] Hint Resolve fun_is_monotonous : typeclass_instances.
+    
+(***********************************)
+(*          Complete               *)
+(***********************************)
+Class Complete (A : Type) :=
   {
     is_complete : A -> Prop ;
-    is_complete_spec : forall a, is_complete a -> a ⊑ a ;
   }.
 
 Arguments is_complete : simpl never.
 
-#[export] Program Instance completeFun {A B} `{Complete A} `{Complete B} : Complete (A -> B) :=
-  {
-    is_complete f := f ⊑ f /\ forall a, is_complete a -> is_complete (f a) ;
-    is_complete_spec := _;
-  }.
-Solve All Obligations with firstorder.
+Tactic Notation "unfold_complete" "in" hyp(H) := unfold is_complete in H; cbn in H.
+Tactic Notation "unfold_complete" := unfold is_complete; cbn.
 
-Lemma is_complete_const_fun : forall {A B} `{Complete A} `{Complete B} (b : B), is_complete b -> is_complete (fun _ : A => b).
-Proof.  simpl; intros. red; cbn.   split.
-  - unfold refinement; cbn. eapply is_complete_spec in H3; eauto.
-  - eauto.
+#[export] Hint Extern 0 (Complete _) => eassumption : typeclass_instances.
+#[export] Hint Extern 0 (@is_complete ?A ?B _) => unfold B :  typeclass_instances.
+
+#[export] 
+Instance completeFun {A B} `{Complete A} `{Complete B} : Complete (A -> B) :=
+  {
+    is_complete f := forall a, is_complete a -> is_complete (f a) ;
+  }.
+
+
+Lemma apply_complete : forall {A B} `{Complete A} `{Complete B},
+    forall a, is_complete a -> is_complete (fun f : A -> B => f a).
+Proof.
+  red; simpl; intros; eauto.
+Qed.
+
+#[export] Hint Resolve apply_complete : typeclass_instances.
+
+Lemma is_complete_const_fun : forall {A B} `{Complete A} `{Complete B} (b : B), 
+  is_complete b -> is_complete (fun _ : A => b).
+Proof. 
+  intros ? ? ? ? ? ? b Hb. red; cbn. intros; eauto.
 Qed.
 
 #[export] Hint Resolve is_complete_const_fun : typeclass_instances.
 
-Class Ground (A : Type) `{Refinable A} `{Complete A} : Type :=
+(***********************************)
+(*          Ground                 *)
+(***********************************)
+Class Ground (A : Type) `{Refinable A} `{Complete A} :=
   {
     is_complete_minimal : forall a, is_complete a -> forall a', a' ⊑ a -> a' = a
   }.
 
 
-
-(* Makes refinable instances where the refinement relation is equality. *)
-Definition mkEqRefinable (A : Type) : Refinable A :=
+(***********************************)
+(*          Equality instances     *)
+(***********************************)
+(* Defining equality as a "default" refinement relation. *)
+#[export]
+Instance eqRefinable (A : Type) : Refinable A | 100 :=
  {|
-  refinement (x y : A) := x = y ;
-  is_transitive := ltac:(unfold Relation_Definitions.transitive; try induction x; eauto; intros; subst; eauto);
-  is_right_reflexive := ltac:(simpl; eauto) ;
-  |}.
+  refinement := eq ;
+  is_transitive := ltac:(unfold transitive; etransitivity; eauto);
+  is_reflexive := ltac:(red; intros; reflexivity) ;
+ |}.
 
   
 (* Makes complete instances where the complete predicate is always true. 
   The premise is just to reuse the definition for other types with eq refinement.
 *)
-Program Definition mkCompleteTrue (A : Type) (refEqA := mkEqRefinable A) : Complete A :=
+#[export]
+Instance eqCompleteTrue (A : Type) : Complete A | 100 :=
   {|
-    is_complete _:= True ;
-    is_complete_spec := _
+    is_complete _ := True ;
   |}.
-Next Obligation. reflexivity. Qed.
 
-Program Instance mkGroundTrue (A : Type) (refEqA := mkEqRefinable A) (compA := mkCompleteTrue A) : Ground A :=
-  {|
-    is_complete_minimal := _
-  |}.
-Next Obligation. eauto. Qed.
+#[export]
+Hint Extern 0 (@is_complete ?A (eqCompleteTrue _) _) =>
+exact I
+:  typeclass_instances.
 
-Tactic Notation "unfold_complete" "in" hyp(H) := unfold is_complete in H; cbn in H.
-Tactic Notation "unfold_complete" := unfold is_complete; cbn.
-Tactic Notation "unfold_refinement" := unfold refinement; cbn.
-Tactic Notation "unfold_refinement" "in" hyp(H) := unfold refinement in H; cbn in H.
+
+#[export]
+Instance eqGroundTrue (A : Type) (refEqA := eqRefinable A) (compA := eqCompleteTrue A) : Ground A.
+Proof. econstructor. eauto. Qed.
+
   
-From Coq Require Import FunctionalExtensionality.
 
 Section Monotonicity.
-  Context {A} `{HAC : Complete A}.
+  Context {A} {HA: Refinable A} {HAC : Complete A}.
 
   Class Monotonizable (P : A -> Prop) :=
     {
       monotone : A -> Prop;
       antitone : A -> Prop;
-      is_monotone : forall a1 a2, a1 ⊑ a2 -> monotone a1 ⊑ monotone a2;
-      is_antitone : forall a1 a2, a1 ⊑ a2 -> antitone a2 ⊑ antitone a1;
+      is_monotone : forall a1 a2, a1 ⊑ a2 -> monotone a1 -> monotone a2;
+      is_antitone : forall a1 a2, a1 ⊑ a2 -> antitone a2 -> antitone a1;
       complete_monotone_is_equivalent : forall (a : A), is_complete a -> monotone a <-> P a;
       complete_antitone_is_equivalent : forall (a : A), is_complete a -> antitone a <-> P a
     }.
@@ -141,104 +151,73 @@ Section Monotonicity.
   Arguments monotone P {Monotonizable} a. 
   Arguments antitone P {Monotonizable} a. 
 
-  Obligation Tactic :=  try now intuition.
 
-  #[export] Program Instance monotonizable_const (P : Prop) : Monotonizable (fun a => P) := {
+  Obligation Tactic :=  try now eauto.
+
+  #[export] 
+  Program Instance monotonizableConst (P : Prop) : Monotonizable (fun a => P) := {
       monotone := fun _ => P ;
       antitone := fun _ => P ;
     }.
   
-  #[export] Program Instance monotonizable_eq {B} `{HB : Ground B}
-    (g h : A -> B) (Hcg : is_complete g) (Hch : is_complete h)
+  Obligation Tactic :=  try now intuition.
+
+  #[export] 
+  Program Instance monotonizableEq {B} `{HB : Ground B}
+    (g h : A -> B) (Hcg : is_monotonous g) (Hch : is_monotonous h)
+    (Hcg' : is_complete g) (Hch' : is_complete h)
     : Monotonizable (fun a => g a = h a) | 2
     := {
       monotone := fun a => exists b, b ⊑ g a /\ b ⊑ h a ;
       antitone := fun a => is_complete (g a) /\ g a = h a ; 
     }.
   Next Obligation.
-    intros ? ? ? ? ? g h ? ? a1 a2 Hprec [b [? ?]].
+    intros ? ? ? ? g h ? ? ? ? a1 a2 Hprec [b [? ?]].
     exists b. split.
-    - transitivity (g a1) ; auto. eapply is_complete_spec in Hcg; edestruct Hcg; eauto.
-    - transitivity (h a1) ; auto. eapply is_complete_spec in Hch; edestruct Hch; eauto.
+    - transitivity (g a1) ; auto. 
+    - transitivity (h a1) ; auto.
   Qed.
   Next Obligation.
-    intros ? ? ? ? ? g h ? ? a1 a2 Hprec [? ?].
-    erewrite (is_complete_minimal _ H3 (g a1)).
-    - split; eauto. rewrite H4 in H3.
-      erewrite (is_complete_minimal _ H3 (h a1)); eauto.
-      unfold_complete in Hch; destruct Hch as [Hhmono _].
-      apply Hhmono; eauto.
-    - unfold_complete in Hcg; destruct Hcg as [Hgmono _].
-      apply Hgmono; eauto.
+    intros ? ? ? ? g h ? ? ? ? a1 a2 Hprec [Hgc Heq].
+    erewrite (is_complete_minimal _ Hgc (g a1)).
+    - split; eauto. rewrite Heq in Hgc.
+      erewrite (is_complete_minimal _ Hgc (h a1)); eauto.
+    - eauto.
   Qed.
   Next Obligation.
-    intros B ? ? ? ? g h Hcg Hch a Hca. split.
-    - intros [b [Hb1 Hb2]]. destruct Hcg, Hch.
+    intros B ? ? ? g h ? ? Hcg Hch a Hca. split.
+    - intros [b [Hb1 Hb2]].
       eapply is_complete_minimal in Hb1; eauto.
       eapply is_complete_minimal in Hb2; eauto; subst.
       assumption.
-    - intros ->. destruct Hch. eapply is_complete_spec in Hca.
-      edestruct H3; eauto.
-  Qed.
-  Next Obligation.
-    intros B ? ? ? ? g h Hcg Hch a Hca. split.
-    - intros []; eauto.
-    - intros ->; split; eauto. unfold_complete in Hch.
-      destruct Hch as [_ Hch]; apply Hch; eauto.
+    - intros ->. eexists; split; reflexivity.
   Qed.
 
-#[export] Program Instance monotonizable_eq_2 {B} `{HB : Ground B}
-    (g : A -> B) (Hcg : is_complete g) (b : B) : Monotonizable (fun a => g a = b) | 1 := {
+  #[export] 
+  Program Instance monotonizableEqL {B} `{HB : Ground B}
+    (g : A -> B) (Hcg : is_complete g) (Hmonog : is_monotonous g) 
+    (b : B) : Monotonizable (fun a => g a = b) | 1 := {
       monotone := fun a => b ⊑ g a ;
       antitone := fun a => is_complete (g a) /\ g a = b ;
     }.
   Next Obligation.
-    intros ? ? ? ? ? g [Hcg ?] b a1 a2 Hprec ?.
+    cbn; intros ? ? ? ? g Hcg ? b a1 a2 Hprec ?.
     transitivity (g a1); try apply Hcg; eauto.
   Qed.
   Next Obligation.
-  intros ? ? ? ? ? g [Hcg ?] b a1 a2 Hprec [? ?].
-  unfold_refinement in Hcg. edestruct Hcg as [Hmono ?]; eauto. eapply is_complete_minimal in Hmono; eauto.
-  rewrite Hmono; eauto.
+    intros ? ? ? ? g ? Hmono b a1 a2 Hprec [? ?]. 
+    eapply is_complete_minimal in Hmono; eauto.
+    rewrite Hmono; eauto.
   Qed.
   Next Obligation.
-    intros B ? ? ? ? g [? ?] ? a Hca. split; [intros Hbg | intros <-].
+    intros B ? ? ? g ? ? ? a Hca. split; [intros Hbg | intros <-].
     - eapply is_complete_minimal in Hbg; eauto.
-    - apply is_complete_spec; eauto.
-  Qed.
-  Next Obligation.
-    intros B ? ? ? ? g [? ?] ? a Hca. split; [intros [? Hbg] | intros <-]; eauto.
+    - reflexivity.
   Qed.
 
-  #[export] Program Instance monotonizable_eq_fun {B C} `{HB : Refinable B} `{HC : Refinable C}
-    (g h : A -> B -> C) {Hmono : Monotonizable (fun a => forall b, g a b = h a b)} : Monotonizable (fun a => g a = h a) := {
-      monotone := monotone _ ;
-      antitone := antitone _ ;
-    }.
-  Next Obligation.
-    intros B C HB HC g h Hmono a1 a2 Hprec Hmono1.
-    eapply is_monotone; eauto.
-  Qed.
-  Next Obligation.
-    intros B C HB HC g h Hmono a1 a2 Hprec Hmono1.
-    eapply is_antitone; eauto.
-  Qed.
-  Next Obligation with eauto.
-    intros B C HB HC g h Hmono a Hac; simpl; split; intros Hp.
-    - apply functional_extensionality; intros b.
-      eapply Hmono.(complete_monotone_is_equivalent)...
-    - eapply complete_monotone_is_equivalent...
-      intros b. rewrite Hp...
-  Qed.
-  Next Obligation with eauto.
-    intros B C HB HC g h Hmono a Hac; simpl; split; intros Hp.
-    - apply functional_extensionality; intros b.
-      eapply Hmono.(complete_antitone_is_equivalent)...
-    - eapply complete_antitone_is_equivalent...
-      intros b; rewrite Hp...
-  Qed.
-
-  #[export] Program Instance monotonizable_forall {B} {P : B -> A -> Prop} `{HPB : forall b, Monotonizable (P b)} : Monotonizable (fun a => forall b, P b a) :=
+  #[export] 
+  Program Instance monotonizableForall {B} {P : B -> A -> Prop} `{HPB : forall b, Monotonizable (P b)} :      
+    Monotonizable (fun a => forall b, P b a) :=
     {
       monotone := fun a => forall b, monotone (P b) a ;
       antitone := fun a => forall b, antitone (P b) a ;
@@ -262,7 +241,10 @@ Section Monotonicity.
     intros B P HPB a Hac; simpl; split; intros HP b; eapply (HPB b).(complete_antitone_is_equivalent)...
   Qed.
 
-  #[export] Program Instance monotonizable_exists {B} `{HB: Refinable B} {P : B -> A -> Prop} `{HPB : forall b, Monotonizable (P b)} : Monotonizable (fun a => exists b, P b a) :=
+  #[export] 
+  Program Instance monotonizableExists {B} `{HB: Refinable B} 
+    {P : B -> A -> Prop} `{HPB : forall b, Monotonizable (P b)} 
+    : Monotonizable (fun a => exists b, P b a) :=
     {
       monotone := fun a => exists b, monotone (P b) a ;
       antitone := fun a => exists b, antitone (P b) a ;
@@ -284,7 +266,9 @@ Section Monotonicity.
       eapply (HPB b).(complete_antitone_is_equivalent)...
   Qed.
 
-  #[export] Program Instance monotonizable_conj (P Q : A -> Prop) {HP : Monotonizable P} {HQ : Monotonizable Q} : Monotonizable (fun a => P a /\ Q a) :=
+  #[export] 
+  Program Instance monotonizableConj (P Q : A -> Prop) {HP : Monotonizable P} {HQ : Monotonizable Q} :  
+    Monotonizable (fun a => P a /\ Q a) :=
     {
       monotone := fun a => (monotone P a) /\ (monotone Q a) ;
       antitone := fun a => (antitone P a) /\ (antitone Q a) ;
@@ -306,7 +290,9 @@ Section Monotonicity.
     intros P Q HP HQ a Hac; simpl; split; intros [HP1 HQ1]; split; try eapply complete_antitone_is_equivalent...
   Qed.
 
-  #[export] Program Instance monotonizable_disj (P Q : A -> Prop) {HP : Monotonizable P} {HQ : Monotonizable Q} : Monotonizable (fun a => P a \/ Q a) :=
+  #[export] 
+  Program Instance monotonizableDisj (P Q : A -> Prop) {HP : Monotonizable P} {HQ : Monotonizable Q} : 
+    Monotonizable (fun a => P a \/ Q a) :=
     {
       monotone := fun a => (monotone P a) \/ (monotone Q a) ;
       antitone := fun a => (antitone P a) \/ (antitone Q a) ;
@@ -332,7 +318,9 @@ Section Monotonicity.
       try (now right; apply complete_antitone_is_equivalent; eauto).
   Qed.
 
-  #[export] Program Instance monotonizable_arrow {P Q : A -> Prop} {HP : Monotonizable P} {HQ : Monotonizable Q} : Monotonizable (fun a => P a -> Q a) :=
+  #[export] 
+  Program Instance monotonizableArrow {P Q : A -> Prop} {HP : Monotonizable P} {HQ : Monotonizable Q} : 
+    Monotonizable (fun a => P a -> Q a) :=
     {
       monotone := fun a => antitone P a -> monotone Q a ;
       antitone := fun a => monotone P a -> antitone Q a ;
@@ -341,69 +329,38 @@ Section Monotonicity.
     simpl; intros P Q HP HQ a1 a2 Hprec ? Hanti.
     eapply HQ.(is_monotone).
     - apply Hprec.
-    - apply H0. eapply HP.(is_antitone); eauto.
+    - apply H. eapply HP.(is_antitone); eauto.
   Qed.
   Next Obligation.
     simpl; intros P Q HP HQ a1 a2 Hprec ? Hanti.
     eapply HQ.(is_antitone).
     - apply Hprec.
-    - apply H0. eapply HP.(is_monotone); try apply Hprec; eauto.
+    - apply H. eapply HP.(is_monotone); try apply Hprec; eauto.
   Qed.
   Next Obligation with eauto.
     simpl; intros P Q HP HQ a Ha; split; intros ?.
     - intros H1. eapply HQ.(complete_monotone_is_equivalent); eauto.
-      apply H0. eapply HP.(complete_antitone_is_equivalent); eauto.
+      apply H. eapply HP.(complete_antitone_is_equivalent); eauto.
     - intros H1. eapply HQ.(complete_monotone_is_equivalent); eauto.
-      apply H0. eapply HP.(complete_antitone_is_equivalent); eauto.
+      apply H. eapply HP.(complete_antitone_is_equivalent); eauto.
   Qed.
   Next Obligation with eauto.
     simpl; intros P Q HP HQ a Ha; split; intros ?.
     - intros H1. eapply HQ.(complete_antitone_is_equivalent); eauto.
-      apply H0. eapply HP.(complete_monotone_is_equivalent); eauto.
+      apply H. eapply HP.(complete_monotone_is_equivalent); eauto.
     - intros H1. eapply HQ.(complete_antitone_is_equivalent); eauto.
-      apply H0. eapply HP.(complete_monotone_is_equivalent); eauto.
-  Qed.
-
- #[export] Program Instance monotonizable_refinement {B} `{Ground B}
-   (g : A -> B) (Hcg : is_complete g) (b : B) (Hb : is_complete b) : Monotonizable (fun a => g a ⊑ b) := {
-      monotone := fun a => b ⊑ g a ;
-      antitone := fun a => g a ⊑ b ;
-    }.
-  Next Obligation.
-    intros ? ? ? ? ? g ? b ? a1 a2 Hprec ?; cbn. 
-    transitivity (g a1); eauto.
-    apply Hcg; eauto.
-  Qed.
-  Next Obligation.
-    intros ? ? ? ? ? g ? b ? a1 a2 Hprec ?; cbn.
-    transitivity (g a2); eauto.
-    apply Hcg; eauto.
-  Qed.
-  Next Obligation.
-    intros B ? ? ? ? g ? ? ? a Hca.
-    split; intros Hbg; pose proof (Hbg' := Hbg); eapply is_complete_minimal in Hbg; eauto; try rewrite Hbg.
-    - eapply is_right_reflexive; eauto.
-    - apply Hcg; eauto.
-    - eapply is_right_reflexive; eauto.
+      apply H. eapply HP.(complete_monotone_is_equivalent); eauto.
   Qed.
 
 End Monotonicity.
 
-Arguments monotone {A H HAC} P {Monotonizable} _. 
-Arguments antitone {A H HAC} P {Monotonizable} _. 
+Arguments monotone {A HA HAC} P {Monotonizable} _. 
+Arguments antitone {A HA HAC} P {Monotonizable} _. 
 
-#[export] Hint Extern 0 (Complete _) => eassumption : typeclass_instances.
-
-Lemma fun_is_complete_if_complete_dom : forall {A B} `{Complete A} `{Complete B},
-    forall a, is_complete a -> is_complete (fun f : A -> B => f a).
-Proof.
-  simpl; intros; split.
-  - unfold refinement; cbn. split; intros; edestruct H4; eauto; eapply is_complete_spec in H3; eauto.
-  - intros. destruct H4. eauto.
-Qed.
-
-#[export] Hint Resolve fun_is_complete_if_complete_dom : typeclass_instances.
-Lemma monotonizable_equiv : forall A `{Complete A} (P Q : A -> Prop) , Monotonizable P -> (forall a, P a <-> Q a) -> Monotonizable Q.
+Lemma monotonizable_equiv : forall A `{Refinable A} `{Complete A} (P Q : A -> Prop) , 
+  Monotonizable P -> 
+  (forall a, P a <-> Q a) -> 
+  Monotonizable Q.
 Proof.
   intros A HAR HAC P Q HPmono Hequiv.
   unshelve econstructor.
@@ -419,14 +376,16 @@ Proof.
     * intros HQa. apply Hequiv in HQa. eapply HPmono.(complete_antitone_is_equivalent); eauto.
 Qed.
 
-#[export] Instance refinable_bool : Refinable bool := mkEqRefinable bool.
-#[export] Instance complete_bool : Complete bool := mkCompleteTrue bool.
-#[export] Instance ground_bool : Ground bool := mkGroundTrue bool.
-
-Hint Extern 0 (@is_complete ?A (mkEqRefinable _) (mkCompleteTrue _) _) =>
-exact I
-:  typeclass_instances.
-
-Hint Extern 0 (@is_complete ?A ?B ?C _) => unfold B; unfold C
-:  typeclass_instances.
-
+#[export] 
+Instance monotonizable_eq_fun {A} `{Refinable A} `{Complete A} 
+  {B} `{Refinable B} 
+  {C} `{Refinable C}
+  (g h : A -> B -> C) {Hmono : Monotonizable (fun a => forall b, g a b = h a b)} 
+  : Monotonizable (fun a => g a = h a).
+Proof.
+  eapply monotonizable_equiv.
+  - apply Hmono.
+  - intros a; split.
+    * intros Heq. apply functional_extensionality; eauto.
+    * intros ->; eauto. 
+Defined.
