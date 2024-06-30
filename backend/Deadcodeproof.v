@@ -22,6 +22,12 @@ Require Import ValueDomain ValueAnalysis NeedDomain NeedOp Deadcode.
 
 
 
+Lemma function_complete : forall f : function, is_complete f.
+easy.
+Qed.
+
+Hint Resolve function_complete.
+
 (* Beginning of the file *)
 
 (* Definition match_prog_aux trans_f (prog : program) (tprog: RTL_Incomplete.program) := *)
@@ -505,7 +511,8 @@ Definition match_stackframes {B} := @gen_match_stackframes B eq.
 
 
 
-#[local, refine] Instance monoMatchStackframes S1 S2 : Monotonizable (fun transf_f => match_stackframes transf_f S1 S2) :=
+#[local, refine] 
+Instance monoMatchStackframes S1 S2 : Monotonizable (fun transf_f => match_stackframes transf_f S1 S2) :=
 { 
   monotone := fun tf => gen_match_stackframes (fun x y => y ⊑ x) tf S1 S2 ;
   antitone := fun tf => gen_match_stackframes (fun tf1 tf2 => is_complete tf1 /\ tf1 = tf2) tf S1 S2;
@@ -513,27 +520,21 @@ Definition match_stackframes {B} := @gen_match_stackframes B eq.
 Proof.
   - intros tf tf' Hprec MS; inv MS; econstructor; eauto.
     eapply is_transitive; eauto.
-    apply Hprec; eauto.
-    apply romem_sp.
+    apply Hprec; eauto. 
   - intros tf tf' Hprec MS; inv MS; econstructor; eauto. 
     destruct FUN. 
-    unfold_refinement in Hprec. destruct Hprec as [Hprec' ?].  
-    specialize (Hprec' _ _ (romem_sp (romem_for cu))).
-    unfold_refinement in Hprec'. destruct Hprec' as [Hprec'' ?].
-    specialize (Hprec'' f f eq_refl). 
-    eapply is_complete_minimal in Hprec''; eauto. rewrite Hprec''. rewrite <- H0. eauto.
+    unfold_refinement in Hprec.
+    specialize (Hprec (romem_for cu) f). eapply is_complete_minimal in Hprec; eauto.
+    rewrite Hprec. split; eauto.
 
   - intros tf ?; split.
     * intros MS; inv MS; econstructor; eauto. symmetry. apply is_complete_minimal; eauto. apply H; eauto.
-    apply romem_complete.
-      (* apply romem_complete; eauto. unfold_complete. split. unfold_complete. destruct prog_defs; eauto.  *)
-    * intros MS; inv MS; econstructor; eauto; rewrite <- FUN. apply is_complete_spec; eauto.
-      apply H; eauto. apply romem_complete.
+    * intros MS; inv MS; econstructor; eauto; rewrite <- FUN.  reflexivity.
       
   - intros tf HC; split.
     * intros MS; inv MS; econstructor; eauto. destruct FUN; eauto.
     * intros MS; inv MS; econstructor; eauto. rewrite <- FUN; split; eauto.
-      apply HC; eauto. apply romem_complete. 
+      apply HC; eauto.
 Defined.
 
 Inductive gen_match_states {B} `{Complete (@fundef_ B)}
@@ -595,7 +596,6 @@ Lemma gen_match_stackframes_ref:
   forall {tf tf' S1 S2}, tf ⊑ tf' -> gen_match_stackframes (fun x y => y ⊑ x) tf S1 S2 -> gen_match_stackframes (fun x y => y ⊑ x) tf' S1 S2.
 Proof.
   intros. inv H0. econstructor; eauto. eapply is_transitive; eauto. apply H; eauto.
-  apply romem_sp.
 Qed.
 
 Lemma gen_match_stackframes_ref_eq:
@@ -603,7 +603,7 @@ Lemma gen_match_stackframes_ref_eq:
 Proof.
   intros ? ? ? HC H; inv H; econstructor; eauto.
   symmetry; apply is_complete_minimal; eauto.
-  apply HC; eauto. apply romem_complete.
+  apply HC; eauto. 
 Qed.
 
 Lemma gen_match_stackframes_complete_eq_eq:
@@ -616,36 +616,34 @@ Lemma gen_match_stackframes_eq_ref :
   forall {tf S1 S2}, is_complete tf -> gen_match_stackframes eq tf S1 S2 -> gen_match_stackframes (fun x y => y ⊑ x) tf S1 S2.
 Proof.
   intros ? ? ? HC H; inv H; econstructor; eauto.
-  rewrite <- FUN.
-  apply is_complete_spec; eauto. apply HC; eauto. apply romem_complete. 
+  rewrite <- FUN. reflexivity.
 Qed.
     
 Lemma gen_match_stackframes_eq_complete_eq:
   forall {tf S1 S2}, is_complete tf -> gen_match_stackframes eq tf S1 S2 -> gen_match_stackframes (fun x y => is_complete x /\ x = y) tf S1 S2.
 Proof.
   intros ? ? ? HC H; inv H; econstructor; eauto; split; eauto.
-  apply HC; eauto. apply romem_complete.
+  apply HC; eauto. 
 Qed.
 
 Lemma gen_match_stackframes_monotone_complete :
   forall {tf tf' S1 S2}, tf ⊑ tf' -> gen_match_stackframes (fun x y => is_complete x /\ x = y) tf' S1 S2 -> gen_match_stackframes (fun x y => is_complete x /\ x = y) tf S1 S2.
 Proof.
   intros. inv H0. econstructor; eauto. destruct_ctx.
-  unfold_refinement in H. destruct_ctx.
-  specialize (H0 _ _ (romem_sp (romem_for cu))); destruct_ctx.
-  unfold_refinement in H0. destruct H0 as [H0 ?]. 
-  specialize (H0 _ _ (reflRefinableEq f)). destruct_ctx.
-  apply is_complete_minimal in H0; eauto. rewrite H0; eauto.
+  unfold_refinement in H.
+  specialize (H (romem_for cu) f). 
+  eapply is_complete_minimal in H; eauto. rewrite H; eauto.
 Qed.
 
 Lemma gen_match_stackframes_complete_monotone :
   forall {tf S1 S2}, gen_match_stackframes (fun x y => is_complete x /\ x = y) tf S1 S2 -> gen_match_stackframes (fun x y => y ⊑ x) tf S1 S2.
 Proof.
   intros.  inv H. econstructor; eauto. destruct_ctx.
-  rewrite <- FUN1. apply is_complete_spec; eauto.
+  rewrite <- FUN1. reflexivity.
 Qed.
 
-#[local, refine] Instance monoMatchStates global_transf_f S1 S2 : Monotonizable (fun transf_f => match_states global_transf_f transf_f S1 S2) :=
+#[local, refine] 
+Instance monoMatchStates global_transf_f S1 S2 : Monotonizable (fun transf_f => match_states global_transf_f transf_f S1 S2) :=
 { 
   monotone := fun tf => gen_match_states (fun x y => y ⊑ x) eq global_transf_f tf S1 S2 ;
   antitone := fun tf => gen_match_states (fun tf1 tf2 => is_complete tf1 /\ tf1 = tf2) eq global_transf_f tf S1 S2;
@@ -653,29 +651,27 @@ Qed.
 Proof.
   - intros tf tf' Hprec MS; inv MS; econstructor; eauto. 
     * unshelve eapply (list_forall2_impl _ STACKS). intros ? ? Hgms. unshelve eapply (gen_match_stackframes_ref _ Hgms). eauto.
-    * eapply is_transitive; eauto; apply Hprec. apply romem_sp. apply is_complete_spec; eauto.
+    * eapply is_transitive; eauto; apply Hprec.
     * unshelve eapply (list_forall2_impl _ STACKS). intros ? ? Hgms; unshelve eapply (gen_match_stackframes_ref _ Hgms); eauto.
     * unshelve eapply (list_forall2_impl _ STACKS). intros ? ? Hgms; unshelve eapply (gen_match_stackframes_ref _ Hgms); eauto.
 
   - intros tf tf' Hprec MS; inv MS; econstructor; eauto.
     * unshelve eapply (list_forall2_impl _ STACKS). intros ? ? Hgms; unshelve eapply (gen_match_stackframes_monotone_complete _ Hgms); eauto.
-    * unfold_refinement in Hprec. destruct Hprec as [Hprec ?]. 
-      specialize (Hprec _ _ (romem_sp (romem_for cu))); destruct_ctx.
-      unfold_refinement in Hprec; destruct Hprec as [Hprec ?].
-      specialize (Hprec _ _ (reflRefinableEq f)); destruct_ctx.
-      rewrite <- FUN1. eapply is_complete_minimal in Hprec; eauto. rewrite Hprec; eauto.
+    * unfold_refinement in Hprec. destruct_ctx.
+      specialize (Hprec (romem_for cu) f).
+      eapply is_complete_minimal in Hprec; eauto. rewrite Hprec; eauto.
     * unshelve eapply (list_forall2_impl _ STACKS). intros ? ? Hgms; unshelve eapply (gen_match_stackframes_monotone_complete _ Hgms); eauto.
     * unshelve eapply (list_forall2_impl _ STACKS). intros ? ? Hgms; unshelve eapply (gen_match_stackframes_monotone_complete _ Hgms); eauto.
 
    - intros tf ?; split. 
     * intros MS; inv MS; econstructor; eauto.
       + unshelve eapply (list_forall2_impl _ STACKS). intros ? ? Hgms; unshelve eapply (gen_match_stackframes_ref_eq _ Hgms); eauto.
-      + symmetry; apply is_complete_minimal; eauto; apply H; eauto; apply romem_complete; eauto.
+      + symmetry; apply is_complete_minimal; eauto; apply H; eauto.
       + unshelve eapply (list_forall2_impl _ STACKS). intros ? ? Hgms; unshelve eapply (gen_match_stackframes_ref_eq _ Hgms); eauto.
       + unshelve eapply (list_forall2_impl _ STACKS). intros ? ? Hgms; unshelve eapply (gen_match_stackframes_ref_eq _ Hgms); eauto.
     * intros MS; inv MS; econstructor; eauto.
       + unshelve eapply (list_forall2_impl _ STACKS). intros ? ? Hgms; unshelve eapply (gen_match_stackframes_eq_ref _ Hgms); eauto.
-      + rewrite <- FUN; apply is_complete_spec; eauto. apply H; eauto. apply romem_complete.
+      + rewrite <- FUN. reflexivity.
       + unshelve eapply (list_forall2_impl _ STACKS). intros ? ? Hgms; unshelve eapply (gen_match_stackframes_eq_ref _ Hgms); eauto.
       + unshelve eapply (list_forall2_impl _ STACKS). intros ? ? Hgms; unshelve eapply (gen_match_stackframes_eq_ref _ Hgms); eauto.
 
@@ -687,7 +683,7 @@ Proof.
       + unshelve eapply (list_forall2_impl _ STACKS). intros ? ? Hgms; unshelve eapply (gen_match_stackframes_complete_eq_eq _ Hgms); eauto.
     * intros MS; inv MS; econstructor; eauto;  eauto.
       + unshelve eapply (list_forall2_impl _ STACKS). intros ? ? Hgms; unshelve eapply (gen_match_stackframes_eq_complete_eq _ Hgms); eauto.
-      + split; eauto. apply HC; eauto. apply romem_complete.
+      + split; eauto. apply HC; eauto. 
       + unshelve eapply (list_forall2_impl _ STACKS). intros ? ? Hgms; unshelve eapply (gen_match_stackframes_eq_complete_eq _ Hgms); eauto.
       + unshelve eapply (list_forall2_impl _ STACKS). intros ? ? Hgms; unshelve eapply (gen_match_stackframes_eq_complete_eq _ Hgms); eauto.
 Defined.      
@@ -724,13 +720,12 @@ Definition match_succ_states_stm {B} `{Complete (@fundef_ B)} global_transf_f (t
 Instance : Monotonizable  (match_succ_states_stm transf_function).
 Proof.
   unfold match_succ_states_stm.
-  repeat (unshelve eapply monotonizable_forall; intros).
-  unshelve eapply monotonizable_arrow.
-  unshelve eapply monotonizable_arrow.
-  unshelve eapply monotonizable_eq_2.
-  unfold is_complete. unfold_complete. split.
-  - apply sp_fun. intros; repeat split. apply H; try apply romem_sp; try apply program_sp; try apply is_complete_spec; eauto.
-  - intros; apply H; try apply romem_complete; eauto.
+  repeat (unshelve eapply monotonizableForall; intros).
+  unshelve eapply monotonizableArrow.
+  unshelve eapply monotonizableArrow.
+  unshelve eapply monotonizableEqL.
+  - unfold_complete. intros ? Hc. apply Hc; eauto.
+  - unfold is_monotonous; intros ? ? Hprec; apply Hprec.
 Defined.
 
 Lemma match_succ_states : monotone (match_succ_states_stm transf_function) transf_function.
@@ -745,7 +740,7 @@ Proof.
   econstructor; eauto.
   (* START NEW : Changes from original proof *)
   - eapply list_forall2_impl; [|eauto]. intros; eapply gen_match_stackframes_complete_monotone; eauto.
-  - rewrite <- H0. apply is_complete_spec; eauto. 
+  - rewrite <- H0. reflexivity.
   (* END NEW *)
   - eapply eagree_ge; eauto.
   - eapply magree_monotone; eauto.
@@ -1086,7 +1081,7 @@ Ltac UseTransfer :=
   
   constructor; auto. eapply gen_match_stackframes_intro with (cu := cu); eauto.
   (* new case *) 
-  rewrite <- FUN. apply is_complete_spec. apply H1.
+  rewrite <- FUN. reflexivity.
   intros.
   edestruct analyze_successors; eauto. simpl; eauto.
   eapply eagree_ge; eauto. rewrite ANPC. simpl.
@@ -1340,7 +1335,7 @@ Ltac UseTransfer :=
   (* new case *)
   eapply list_forall2_impl; [| eauto]. intros; eapply gen_match_stackframes_complete_monotone; eauto.
   fold (transf_function (romem_for cu) f).
-  rewrite EQ. apply is_complete_spec; eauto.
+  rewrite EQ. reflexivity.
   apply eagree_init_regs; auto.
   apply mextends_agree; auto.
 
@@ -1364,7 +1359,7 @@ Ltac UseTransfer :=
   (* forall2 *)
   eapply list_forall2_impl; [| eauto]. intros; eapply gen_match_stackframes_complete_monotone; eauto.
 
-  rewrite <- FUN. apply is_complete_spec; eauto.
+  rewrite <- FUN. reflexivity.
   apply mextends_agree; auto.
 Qed.
 
@@ -1393,13 +1388,15 @@ Hint Resolve is_complete_transf_function : core.
 Lemma is_complete_to_RTL_Incomplete_fundef f : is_complete (to_RTL_Incomplete_fundef f).
 Proof.
   destruct f; red; cbn.
-  - red; cbn. repeat split. induction (fn_params f); red; cbn; eauto.
-    red; cbn. intro. rewrite PTree.gmap. unfold option_map.
-    destruct (_ ! _); red; cbn; eauto. destruct i; econstructor; eauto.
-    all: try induction l; red; cbn; eauto.
-    1-2: destruct s0; red; cbn ;eauto.
+  - unfold_complete. repeat split.
+    +  induction (fn_params f); unfold_complete; eauto. split; eauto.
+    unfold_complete; eauto.
+    + unfold_complete. intro. rewrite PTree.gmap. unfold option_map.
+    destruct (_ ! _); unfold_complete; eauto. destruct i; econstructor; eauto; try now (unfold_complete; eauto).
+    all: try induction l; unfold_complete; eauto; try split; unfold_complete; eauto.
+    1-2: destruct s0; eauto.
     destruct o; eauto.   
-  - destruct e; eauto.    
+  - unfold_complete; eauto.
 Qed. 
 
 Lemma Tree_map_node (A B : Type) (f : A -> B) (l r : PTree.tree A) o : 
@@ -1451,11 +1448,8 @@ Program Definition transf_function_complete (r : romem) (f : function) : res fun
   | OK tf => fun H => OK (to_RTL_function tf H)
   | Error msg => fun _ => Error msg
   end _.
-Next Obligation. 
-  pose proof (is_complete_transf_function). unfold_complete in H.
-  destruct H.
-  specialize (H0 r (romem_complete r)).
-  unfold_complete in H0. destruct H0; eauto.
+Next Obligation.
+  pose proof (H := is_complete_transf_function). apply H; eauto.
 Defined.
 
 Definition  bind_pure {A B} (f : A -> B) (a:res A) :=
@@ -1465,9 +1459,10 @@ Lemma transf_function_complete_spec r f :
   bind_pure to_RTL_Incomplete_function (transf_function_complete r f) = 
   transf_function r f.
 Proof.
-  unfold bind_pure, bind, transf_function_complete, transf_function_complete_obligation_1. 
-  set is_complete_transf_function. destruct i. destruct i.
-  set (i0 _ _). clearbody i1. set (transf_function r f) in *. destruct r2; eauto.
+  unfold bind_pure, bind, transf_function_complete, transf_function_complete_obligation_1.
+  set is_complete_transf_function.
+  set (i _ _ _ _). clearbody i0. 
+  set (transf_function r f) in *. destruct r0; eauto.
   f_equal. destruct f0. destruct to_RTL_function; eauto.
 Qed. 
 
@@ -1487,11 +1482,11 @@ Lemma transf_function_complete_to_RTL r f tf :
   transf_function r f = OK (to_RTL_Incomplete_function tf).
 Proof. 
   intros EQ. unfold transf_function_complete, transf_function_complete_obligation_1 in *.  
-  set is_complete_transf_function in EQ. destruct i. destruct (i _ _).
-  set (i0 _ _) in *. clearbody i1. destruct transf_function; inversion EQ; cbn.  repeat f_equal.
+  set is_complete_transf_function in EQ.
+  set (i _ _ _ _) in *. clearbody i0. destruct transf_function; inversion EQ; cbn.  repeat f_equal.
   destruct f0; unfold to_RTL_Incomplete_function, map_function_; f_equal; cbn in *.
   eapply PTree.extensionality; intro p. rewrite PTree.gmap. unfold option_map.
-  unfold to_RTL_function_obligation_1. destruct i1, a, a, a. cbn.  destruct to_RTL_code; cbn.
+  unfold to_RTL_function_obligation_1. destruct i0, a, a, a. cbn.  destruct to_RTL_code; cbn.
   rewrite <- e. now erewrite PTree.gmap.
 Qed. 
 
@@ -1500,8 +1495,8 @@ Lemma transf_function_complete_to_RTL_error r f e :
   transf_function r f = Error e.
 Proof. 
   intros EQ. unfold transf_function_complete, transf_function_complete_obligation_1 in *.  
-  set is_complete_transf_function in EQ. destruct i. destruct (i _ _).
-  set (i0 _ _) in *. clearbody i1. destruct transf_function; inversion EQ; cbn.  repeat f_equal.
+  set is_complete_transf_function in EQ. 
+  set (i _ _ _ _) in *. clearbody i0. destruct transf_function; inversion EQ; cbn.  repeat f_equal.
 Qed. 
 
 Lemma transf_fundef_complete_to_RTL r f tf : 
@@ -1857,11 +1852,11 @@ Proof.
   intros. assert (AST.transf_partial_fundef (transf_function rm) f = OK (to_RTL_Incomplete_fundef tf)).
   { destruct f. monadInv H. cbn.    
     unfold transf_function_complete, transf_function_complete_obligation_1 in *.  
-    set is_complete_transf_function in EQ. destruct i. destruct (i _ _).
-    set (i0 _ _) in *. clearbody i1. destruct transf_function; inversion EQ; cbn.  repeat f_equal.
+    set is_complete_transf_function in EQ. 
+    set (i _ _ _ _) in *. clearbody i0. destruct transf_function; inversion EQ; cbn.  repeat f_equal.
     destruct f0; unfold to_RTL_Incomplete_function, map_function_; f_equal; cbn in *.
     eapply PTree.extensionality; intro p. rewrite PTree.gmap. unfold option_map.
-    unfold to_RTL_function_obligation_1. destruct i1, a, a, a. cbn.  destruct to_RTL_code; cbn.
+    unfold to_RTL_function_obligation_1. destruct i0, a, a, a. cbn.  destruct to_RTL_code; cbn.
     rewrite <- e. now erewrite PTree.gmap. 
     cbn in *. destruct tf; inversion H; subst; eauto. }
   eapply sig_function_translated in H0.
