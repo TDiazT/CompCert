@@ -179,18 +179,21 @@ Defined.
 
 #[export, refine] 
 Instance monoForall2 {C} `{Refinable C} `{Complete C} {A} (l1 : list A) {B} (l2 : list B) (f : C -> A -> B -> Prop) 
-  {Hf : forall a b, Monotonizable (fun c => f c a b)} : Monotonizable (fun c => list_forall2 (f c) l1 l2) := 
+  {Hf : forall a b, IncRef (fun c => f c a b)} : IncRef (fun c => list_forall2 (f c) l1 l2) := 
 {
-  monotone := fun c => list_forall2 (fun a b => monotone (fun c => f c a b) c) l1 l2;
-  antitone := fun c => list_forall2 (fun a b => antitone (fun c => f c a b) c) l1 l2;
+  ir_mono := fun c => list_forall2 (fun a b => ir_mono (fun c => f c a b) c) l1 l2;
+  ir_anti := fun c => list_forall2 (fun a b => ir_anti (fun c => f c a b) c) l1 l2;
 }.
 Proof.
-  - intros ? ? ?; induction 1; constructor; eauto. eapply is_monotone; eauto.
-  - intros ? ? ?; induction 1; constructor; eauto. eapply is_antitone; eauto.
-  - intros c ?; split; induction 1; econstructor; eauto.
-    * eapply (Hf a1 b1).(complete_monotone_is_equivalent); eauto.
-    * eapply (Hf a1 b1).(complete_monotone_is_equivalent); eauto.
-  - intros c ?; split; induction 1; econstructor; eauto; eapply (Hf a1 b1).(complete_antitone_is_equivalent); eauto.
+  - intros ? ? ?; induction 1; constructor; eauto. eapply is_monotone_mono; eauto.
+  - intros ? ? ?; induction 1; constructor; eauto. eapply is_antitone_anti; eauto.
+  - intros ?; induction 1; constructor; eauto. eapply approx_mono; eauto.
+  - intros ?. induction 1; constructor; eauto. set (c := a) in *.
+    eapply (Hf a1 b1). apply H1. 
+  - intros c ?; induction 1; econstructor; eauto.
+    pattern c. eapply (recoverability_mono c H1); eauto.
+  - intros c ?; induction 1; econstructor; eauto.
+    eapply (recoverability_anti c H1); eauto. 
 Defined.
   
 
