@@ -439,3 +439,12 @@ Proof.
     * intros. apply functional_extensionality; eauto.
     * intros ->; eauto. 
 Defined.
+
+#[export] 
+Instance IncRefEqR {A} `{Refinable A} `{Complete A} {B} `{HB : CompleteMinimal B}
+  (f : A -> B) (Hcf : is_complete f) (Hmonof : is_monotone f) 
+  (b : B) : IncRef (fun a => b = f a).
+Proof.
+  eapply IncRefEquiv with (P := (fun a => f a = b)); try intuition.
+  eapply IncRefEqL; eauto.
+Qed.  
