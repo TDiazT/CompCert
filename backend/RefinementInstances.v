@@ -33,7 +33,7 @@ Ltac destruct_ctx :=
 {
   refinement r1 r2 := match r1, r2 with 
   | OK x1, OK x2 => x1 ⊑ x2
-  (* Just to get ground *)
+  (* Just to get completeMinimal *)
   | Error e1, Error e2 => e1 = e2
   | _, _ => False
   end
@@ -55,7 +55,7 @@ Instance completeRes {A} `{Complete A} : Complete (res A) :=
   }.
 
 #[export] 
-Instance groundRes {A} `{Ground A} : Ground (res A).
+Instance completeMinimalRes {A} `{CompleteMinimal A} : CompleteMinimal (res A).
 Proof. 
   constructor; intros [] ? []; simpl; try contradiction; intros.
   - f_equal. eapply is_complete_minimal; eauto.
@@ -87,7 +87,7 @@ Instance completeOption {A} `{Complete A} : Complete (option A) :=
   }.
 
 #[export] 
-Instance groundOption {A} `{Ground A} : Ground (option A).
+Instance completeMinimalOption {A} `{CompleteMinimal A} : CompleteMinimal (option A).
 Proof. constructor; intros [] ? []; simpl; try contradiction; intros; eauto.
       f_equal. eapply is_complete_minimal; eauto.
 Defined. 
@@ -121,7 +121,7 @@ Instance completeList {A} `{Complete A} : Complete (list A) :=
   }.
 
 #[export] 
-Instance groundList {A} `{Ground A} : Ground (list A).
+Instance completeMinimalList {A} `{CompleteMinimal A} : CompleteMinimal (list A).
 Proof. constructor; intros l; induction l; intros [] []; try contradiction; eauto.
   intros []. f_equal. eapply is_complete_minimal; eauto.
   apply IHl; eauto.
@@ -151,7 +151,7 @@ Instance completeSum {A B} `{Complete A} `{Complete B} : Complete (A + B) :=
   }.
 
 #[export] 
-Instance groundSum {A B} `{Ground A} `{Ground B} : Ground (A + B).
+Instance completeMinimalSum {A B} `{CompleteMinimal A} `{CompleteMinimal B} : CompleteMinimal (A + B).
 Proof. constructor; intros [] ?; intros []; try contradiction; intros; eauto; f_equal; eapply is_complete_minimal; eauto.
 Defined.
 
@@ -172,7 +172,7 @@ Instance completeProd {A B} `{Complete A} `{Complete B} : Complete (A * B) :=
   }.
 
 #[export] 
-Instance groundProd {A B} `{Ground A} `{Ground B} : Ground (A * B).
+Instance completeMinimalProd {A B} `{CompleteMinimal A} `{CompleteMinimal B} : CompleteMinimal (A * B).
 Proof. constructor; intros [] [] [] []; f_equal; eapply is_complete_minimal; eauto. 
 Defined. 
 
@@ -250,7 +250,7 @@ Instance completeInstruction : Complete instruction :=
 
 
 #[export, refine] 
-Instance groundInstruction : Ground instruction := {}. 
+Instance completeMinimalInstruction : CompleteMinimal instruction := {}. 
 Proof.
   intros []; inversion 1; intros [] Href; red in Href; cbn in *.
   all: try solve [inversion Href].
@@ -277,7 +277,7 @@ Instance completePTree {A} `{Complete A} : Complete (PTree.t A) :=
 }.
 
 #[export] 
-Program Instance groundPTree {A} `{Ground A} : Ground (PTree.t A).
+Program Instance completeMinimalPTree {A} `{CompleteMinimal A} : CompleteMinimal (PTree.t A).
 Next Obligation.
   intros ? ? ? ? a Hc a' Hprec. eapply PTree.extensionality. intro p; specialize (Hc p).
   eapply is_complete_minimal; eauto.
@@ -321,7 +321,7 @@ Instance : Complete function := {
 }.
 
 #[export] 
-Instance : Ground function.
+Instance : CompleteMinimal function.
 Proof. constructor. intros [] HC [] HR. unfold_complete in HC; unfold_refinement in HR. destruct_ctx. unshelve f_equal; unshelve eapply is_complete_minimal; eauto; try typeclasses eauto.
 Defined.
 
@@ -358,7 +358,7 @@ Instance completeASTFundef {F} `{Complete F} : Complete (AST.fundef F) :=
 }.
 
 #[export] 
-Instance groundASTFundef {F} `{Ground F} : Ground (AST.fundef F).
+Instance completeMinimalASTFundef {F} `{CompleteMinimal F} : CompleteMinimal (AST.fundef F).
 Proof. constructor. intros [] ? [] ?; try contradiction;
   try f_equal; eauto; eapply is_complete_minimal; eauto.
 Qed.
@@ -368,7 +368,7 @@ Instance : Refinable fundef. apply refinableASTFundef. Defined.
 #[export] 
 Instance : Complete fundef. apply completeASTFundef. Defined.
 #[export] 
-Instance : Ground fundef. apply groundASTFundef.  Defined. 
+Instance : CompleteMinimal fundef. apply completeMinimalASTFundef.  Defined. 
 
 
 #[export] 

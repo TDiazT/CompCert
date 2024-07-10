@@ -67,7 +67,8 @@ Tactic Notation "unfold_complete" "in" hyp(H) := unfold is_complete in H; cbn in
 Tactic Notation "unfold_complete" := unfold is_complete; cbn.
 
 #[export] Hint Extern 0 (Complete _) => eassumption : typeclass_instances.
-#[export] Hint Extern 0 (@is_complete ?A ?B _) => unfold B :  typeclass_instances.
+#[export] Hint Extern 0 (@is_complete ?B _) => unfold B :  typeclass_instances.
+#[export] Hint Extern 0 (is_complete _) => unfold_complete : typeclass_instances.
 
 #[export] 
 Instance completeFun {A B} `{Complete A} `{Complete B} : Complete (A -> B) :=
@@ -93,9 +94,9 @@ Qed.
 #[export] Hint Resolve is_complete_const_fun : typeclass_instances.
 
 (***********************************)
-(*          Ground                 *)
+(*          CompleteMinimal        *)
 (***********************************)
-Class Ground (A : Type) `{Refinable A} `{Complete A} :=
+Class CompleteMinimal (A : Type) `{Refinable A} `{Complete A} :=
   {
     is_complete_minimal : forall a, is_complete a -> forall a', a' ⊑ a -> a' = a
   }.
@@ -130,7 +131,7 @@ exact I
 
 
 #[export]
-Instance eqGroundTrue (A : Type) (refEqA := eqRefinable A) (compA := eqCompleteTrue A) : Ground A | 100.
+Instance eqCompleteMinimalTrue (A : Type) (refEqA := eqRefinable A) (compA := eqCompleteTrue A) : CompleteMinimal A | 100.
 Proof. econstructor. eauto. Qed.
 
   
@@ -174,7 +175,7 @@ Section IncReformulation.
   Obligation Tactic :=  try now intuition.
 
   #[export] 
-  Program Instance IncRefEq {B} `{HB : Ground B}
+  Program Instance IncRefEq {B} `{HB : CompleteMinimal B}
     (f g : A -> B) (Hcf : is_monotone f) (Hcg : is_monotone g)
     (Hcf' : is_complete f) (Hcg' : is_complete g)
     : IncRef (fun a => f a = g a) | 2
@@ -207,7 +208,7 @@ Section IncReformulation.
   Qed.
 
   #[export] 
-  Program Instance IncRefEqL {B} `{HB : Ground B}
+  Program Instance IncRefEqL {B} `{HB : CompleteMinimal B}
     (f : A -> B) (Hcf : is_complete f) (Hmonof : is_monotone f) 
     (b : B) : IncRef (fun a => f a = b) | 1 := {
       ir_mono := fun a => b ⊑ f a ;
