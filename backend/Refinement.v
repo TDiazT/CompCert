@@ -20,6 +20,9 @@ Arguments refinement : simpl never.
 Tactic Notation "unfold_refinement" := unfold refinement; cbn.
 Tactic Notation "unfold_refinement" "in" hyp(H) := unfold refinement in H; cbn in H.
 
+#[export] Hint Extern 1 (refinement _ _) => unfold_refinement : typeclass_instances.
+#[export] Hint Extern 0 (refinement _ _) => eassumption : typeclass_instances.
+
 #[export] 
 Instance refinableTransitive {A} `{Refinable A} : Transitive refinement := { transitivity := is_transitive }.
 #[export] 
@@ -42,6 +45,8 @@ Qed.
 (***********************************)
 Definition is_monotone {A B} `{Refinable A} `{Refinable B} (f : A -> B) := 
     forall a1 a2, a1 ⊑ a2 -> f a1 ⊑ f a2.
+
+#[export] Hint Extern 1 (is_monotone _) => unfold is_monotone : typeclass_instances.
 
 Lemma fun_is_monotone : forall {A B} `{Refinable A} `{Refinable B},
     forall a, is_monotone (fun f : A -> B => f a).
