@@ -430,7 +430,7 @@ Proof.
     * intros HPa. apply Hequiv. eapply (complete_monotone_is_equivalent); eauto.
   - intros a Hac.
     * intros HQa. apply Hequiv in HQa. eapply (complete_antitone_is_equivalent); eauto.
-Qed.
+Defined.
 
 #[export] 
 Instance IncRefEq_fun {A} `{Refinable A} `{Complete A} 
@@ -453,4 +453,4 @@ Instance IncRefEqR {A} `{Refinable A} `{Complete A} {B} `{HB : CompleteMinimal B
 Proof.
   eapply IncRefEquiv with (P := (fun a => f a = b)); try intuition.
   eapply IncRefEqL; eauto.
-Qed.  
+Defined.  
