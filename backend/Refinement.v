@@ -68,7 +68,8 @@ Tactic Notation "unfold_complete" := unfold is_complete; cbn.
 
 #[export] Hint Extern 0 (Complete _) => eassumption : typeclass_instances.
 #[export] Hint Extern 0 (@is_complete ?B _) => unfold B :  typeclass_instances.
-#[export] Hint Extern 0 (is_complete _) => unfold_complete : typeclass_instances.
+#[export] Hint Extern 0 (is_complete _) => eassumption : typeclass_instances.
+#[export] Hint Extern 1 (is_complete _) => unfold_complete : typeclass_instances.
 
 #[export] 
 Instance completeFun {A B} `{Complete A} `{Complete B} : Complete (A -> B) :=
