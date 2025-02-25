@@ -1382,10 +1382,79 @@ Proof.
   apply tolerant_step_simulation.
 Qed.
 
-End PRESERVATION.
+Lemma transf_initial_states:
+  forall st1, initial_state prog st1 ->
+  exists st2, initial_state tprog st2 /\ match_states transf_function transf_function st1 st2.
+Proof.
+  intros. inversion H.
+  exploit function_ptr_translated; eauto. intros (cu & tf & A & B & C).
+  exists (Callstate nil tf nil m0); split.
+  econstructor; eauto.
+  eapply (Genv.init_mem_match TRANSF); eauto.
+  replace (prog_main tprog) with (prog_main prog).
+  rewrite symbols_preserved. eauto.
+  symmetry; eapply match_program_main; eauto.
+  rewrite <- H3. eapply sig_function_translated; eauto.
+  econstructor; eauto. constructor. apply Mem.extends_refl.
+Qed.
+
+Lemma transf_final_states:
+  forall st1 st2 r,
+  match_states transf_function transf_function st1 st2 -> final_state st1 r -> final_state st2 r.
+Proof.
+  intros. inv H0. inv H. inv STACKS. inv RES. constructor.
+Qed.
 
 (** * Semantic preservation *)
+(* Cannot yet be defined because it expects complete RTL programs.
+    i.e. tprog : RTL.program, not tprog : RTL_Incomplete.program 
+    
+    This theorem is of particular interest for the final compiler correctness
+    proof. During the incremental process, and while this optimization is not finished, 
+    the final compiler stack of passes should simply not include unfinished passes.
+    *)
 
+(* Theorem transf_program_correct:
+  forward_simulation (RTL.semantics prog) (RTL.semantics tprog).
+Proof.
+  intros.
+  apply forward_simulation_step with
+     (match_states := fun s1 s2 => sound_state prog s1 /\ match_states s1 s2).
+- apply senv_preserved.
+- simpl; intros. exploit transf_initial_states; eauto. intros [st2 [A B]].
+  exists st2; intuition. eapply sound_initial; eauto.
+- simpl; intros. destruct H. eapply transf_final_states; eauto.
+- simpl; intros. destruct H0.
+  assert (sound_state prog s1') by (eapply sound_step; eauto).
+  fold ge; fold tge. exploit step_simulation; eauto. intros [st2' [A B]].
+  exists st2'; auto.
+Qed. *)
+
+End PRESERVATION.
+
+(* The following is additional code related to an approach to opting-out from RTL_Incomplete into RTL. 
+We assume that the function is complete and we try to obtain the transf_program_correct proof. 
+The opting-out process, without deleting and replacing the code, requires transforming from 
+RTL_Incomplete to RTL, preserving several properties.
+
+
+One thing that it requires in particular, is the addition of an `is_complete` premise in the 
+`gen_match_call_states` constructor of `gen_match_states` (currently commented out).
+This needs to be propagated to related definitions, such as `gen_match_succ_states`.
+In total, one needs to add the following parameter to `gen_match_states` and arg to the constructor:
+`{Complete (@fundef_ B)}
+is_complete tf 
+
+Adding this premise still preserves the previous `step_simulation` proof without any changes, 
+however we leave it out because it is not truly necessary for the incremental process we want 
+to illustrate.
+
+Note that the opting-out is quite convoluted and requires a lot of manual work,
+which amounts to ~550 LOC (maybe someone more familiar with CompCert could do it in a simpler way)
+*)
+
+(** * BEGINNING OPTING-OUT *)
+(*
 Axiom (is_complete_transf_function : is_complete transf_function).
 
 Hint Resolve is_complete_transf_function : core.
@@ -1895,6 +1964,7 @@ Proof.
   intros. inv H0. inv H. inv STACKS. inv RES. constructor.
 Qed.
 
+(* Of course this theorem can now be proven using the translation functions and properties between inductives *)
 Theorem transf_program_correct:
     forward_simulation (RTL.semantics prog) (RTL.semantics tprog).
   Proof.
@@ -1930,3 +2000,8 @@ Lemma transf_program_match:
 Proof.
   intros. eapply match_transform_partial_program_contextual; eauto.
 Qed.
+
+*)
+
+(** * ENDING OPTING-OUT *)
+
