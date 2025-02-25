@@ -539,43 +539,41 @@ Proof.
     * rewrite FUN; reflexivity.
 Defined.
 
-Inductive gen_match_states {B} `{Complete (@fundef_ B)}
-  (R1 : res (@function_ B) -> res (@function_ B) -> Prop) 
-  (R2 : res (@fundef_ B) -> res (@fundef_ B) -> Prop)
-  (global_transf_f : romem -> function -> res (@function_ B)) 
+Inductive gen_match_states {B} 
+  (R : res (@function_ B) -> res (@function_ B) -> Prop) 
+  (transf_f_def : romem -> function -> res (@function_ B)) 
   (transf_f : romem -> function -> res (@function_ B)) :
     state -> @state_ B -> Prop := 
 
 | gen_match_regular_states:
 forall s f sp pc e m ts tf te tm cu an
-  (STACKS: list_forall2 (gen_match_stackframes R1 transf_f) s ts)
+  (STACKS: list_forall2 (gen_match_stackframes R transf_f) s ts)
   (LINK: linkorder cu prog)
-  (FUN: R1 (transf_f (romem_for cu) f) (OK tf))
+  (FUN: R (transf_f (romem_for cu) f) (OK tf))
   (ANL: analyze (vanalyze cu f) f = Some an)
   (ENV: eagree e te (fst (transfer f (vanalyze cu f) pc an!!pc)))
   (MEM: magree m tm (nlive ge sp (snd (transfer f (vanalyze cu f) pc an!!pc)))),
-  gen_match_states R1 R2 global_transf_f transf_f (State s f (Vptr sp Ptrofs.zero) pc e m) (State ts tf (Vptr sp Ptrofs.zero) pc te tm)
+  gen_match_states R transf_f_def transf_f (State s f (Vptr sp Ptrofs.zero) pc e m) (State ts tf (Vptr sp Ptrofs.zero) pc te tm)
   
 | gen_match_call_states:
   forall s f args m ts tf targs tm cu
-    (Htf_complete : is_complete tf)
-    (STACKS: list_forall2 (gen_match_stackframes R1 transf_f) s ts)
+    (STACKS: list_forall2 (gen_match_stackframes R transf_f) s ts)
     (LINK: linkorder cu prog)
-    (FUN: R2 (AST.transf_partial_fundef (global_transf_f (romem_for cu)) f) (OK tf))
+    (FUN: (AST.transf_partial_fundef (transf_f_def (romem_for cu)) f) = (OK tf))
     (ARGS: Val.lessdef_list args targs)
     (MEM: Mem.extends m tm),
-  gen_match_states R1 R2 global_transf_f transf_f (Callstate s f args m)
+  gen_match_states R transf_f_def transf_f (Callstate s f args m)
                (Callstate ts tf targs tm)
 
 | gen_match_return_states:
   forall s v m ts tv tm
-    (STACKS: list_forall2 (gen_match_stackframes R1 transf_f) s ts)
+    (STACKS: list_forall2 (gen_match_stackframes R transf_f) s ts)
     (RES: Val.lessdef v tv)
     (MEM: Mem.extends m tm),
-  gen_match_states R1 R2 global_transf_f transf_f (Returnstate s v m)
+  gen_match_states R transf_f_def transf_f (Returnstate s v m)
                (Returnstate ts tv tm).
 
-Definition match_states {B} `{HB : Complete (@fundef_ B)} := gen_match_states (B:=B) eq eq.
+Definition match_states {B} := gen_match_states (B:=B) eq.
 
 
 
@@ -645,10 +643,10 @@ Proof.
 Qed.
 
 #[local, refine] 
-Instance IncRefMatchStates global_transf_f S1 S2 : IncRef (fun transf_f => match_states global_transf_f transf_f S1 S2) :=
+Instance IncRefMatchStates transf_f_def S1 S2 : IncRef (fun transf_f => match_states transf_f_def transf_f S1 S2) :=
 { 
-  ir_mono := fun tf => gen_match_states (fun x y => y ⊑ x) eq global_transf_f tf S1 S2 ;
-  ir_anti := fun tf => gen_match_states (fun tf1 tf2 => is_complete tf1 /\ tf1 = tf2) eq global_transf_f tf S1 S2;
+  ir_mono := fun tf => gen_match_states (fun x y => y ⊑ x) transf_f_def tf S1 S2 ;
+  ir_anti := fun tf => gen_match_states (fun tf1 tf2 => is_complete tf1 /\ tf1 = tf2) transf_f_def tf S1 S2;
 }.
 Proof.
   - intros tf tf' Hprec MS; inv MS; econstructor; eauto. 
@@ -708,7 +706,7 @@ Proof.
 Qed.
 
 
-Definition match_succ_states_stm {B} `{Complete (@fundef_ B)} global_transf_f (transf_f : romem -> function -> res (@function_ B)) :=
+Definition match_succ_states_stm {B} transf_f_def (transf_f : romem -> function -> res (@function_ B)) :=
   forall s f sp pc e m ts tf te tm an pc' cu instr ne nm
     (LINK: linkorder cu prog)
     (STACKS: list_forall2 (match_stackframes transf_f) s ts)
@@ -719,8 +717,7 @@ Definition match_succ_states_stm {B} `{Complete (@fundef_ B)} global_transf_f (t
     (ANPC: an!!pc = (ne, nm))
     (ENV: eagree e te ne)
     (MEM: magree m tm (nlive ge sp nm)),
-  (* TODO : REVIEW THIS *)
-  match_states global_transf_f transf_f (State s f (Vptr sp Ptrofs.zero) pc' e m)
+  match_states transf_f_def transf_f (State s f (Vptr sp Ptrofs.zero) pc' e m)
                (State ts tf (Vptr sp Ptrofs.zero) pc' te tm).
 
 
