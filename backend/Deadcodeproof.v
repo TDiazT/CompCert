@@ -539,11 +539,10 @@ Proof.
     * rewrite FUN; reflexivity.
 Defined.
 
-Inductive gen_match_states {B} 
-  (R : res (@function_ B) -> res (@function_ B) -> Prop) 
-  (transf_f_def : romem -> function -> res (@function_ B)) 
-  (transf_f : romem -> function -> res (@function_ B)) :
-    state -> @state_ B -> Prop := 
+Inductive gen_match_states  
+  (R : res RTL_Incomplete.function -> res RTL_Incomplete.function -> Prop) 
+  (transf_f : romem -> function -> res RTL_Incomplete.function) :
+    state -> RTL_Incomplete.state -> Prop := 
 
 | gen_match_regular_states:
 forall s f sp pc e m ts tf te tm cu an
@@ -553,16 +552,16 @@ forall s f sp pc e m ts tf te tm cu an
   (ANL: analyze (vanalyze cu f) f = Some an)
   (ENV: eagree e te (fst (transfer f (vanalyze cu f) pc an!!pc)))
   (MEM: magree m tm (nlive ge sp (snd (transfer f (vanalyze cu f) pc an!!pc)))),
-  gen_match_states R transf_f_def transf_f (State s f (Vptr sp Ptrofs.zero) pc e m) (State ts tf (Vptr sp Ptrofs.zero) pc te tm)
+  gen_match_states R transf_f (State s f (Vptr sp Ptrofs.zero) pc e m) (State ts tf (Vptr sp Ptrofs.zero) pc te tm)
   
 | gen_match_call_states:
   forall s f args m ts tf targs tm cu
     (STACKS: list_forall2 (gen_match_stackframes R transf_f) s ts)
     (LINK: linkorder cu prog)
-    (FUN: (AST.transf_partial_fundef (transf_f_def (romem_for cu)) f) = (OK tf))
+    (FUN: transf_fundef (romem_for cu) f = OK tf)
     (ARGS: Val.lessdef_list args targs)
     (MEM: Mem.extends m tm),
-  gen_match_states R transf_f_def transf_f (Callstate s f args m)
+  gen_match_states R transf_f (Callstate s f args m)
                (Callstate ts tf targs tm)
 
 | gen_match_return_states:
@@ -570,10 +569,10 @@ forall s f sp pc e m ts tf te tm cu an
     (STACKS: list_forall2 (gen_match_stackframes R transf_f) s ts)
     (RES: Val.lessdef v tv)
     (MEM: Mem.extends m tm),
-  gen_match_states R transf_f_def transf_f (Returnstate s v m)
+  gen_match_states R transf_f (Returnstate s v m)
                (Returnstate ts tv tm).
 
-Definition match_states {B} := gen_match_states (B:=B) eq.
+Definition match_states := gen_match_states eq.
 
 
 
@@ -643,10 +642,10 @@ Proof.
 Qed.
 
 #[local, refine] 
-Instance IncRefMatchStates transf_f_def S1 S2 : IncRef (fun transf_f => match_states transf_f_def transf_f S1 S2) :=
+Instance IncRefMatchStates S1 S2 : IncRef (fun transf_f => match_states transf_f S1 S2) :=
 { 
-  ir_mono := fun tf => gen_match_states (fun x y => y ⊑ x) transf_f_def tf S1 S2 ;
-  ir_anti := fun tf => gen_match_states (fun tf1 tf2 => is_complete tf1 /\ tf1 = tf2) transf_f_def tf S1 S2;
+  ir_mono := fun tf => gen_match_states (fun x y => y ⊑ x) tf S1 S2 ;
+  ir_anti := fun tf => gen_match_states (fun tf1 tf2 => is_complete tf1 /\ tf1 = tf2) tf S1 S2;
 }.
 Proof.
   - intros tf tf' Hprec MS; inv MS; econstructor; eauto. 
@@ -706,7 +705,7 @@ Proof.
 Qed.
 
 
-Definition match_succ_states_stm {B} transf_f_def (transf_f : romem -> function -> res (@function_ B)) :=
+Definition match_succ_states_stm (transf_f : romem -> function -> res RTL_Incomplete.function) :=
   forall s f sp pc e m ts tf te tm an pc' cu instr ne nm
     (LINK: linkorder cu prog)
     (STACKS: list_forall2 (match_stackframes transf_f) s ts)
@@ -717,12 +716,12 @@ Definition match_succ_states_stm {B} transf_f_def (transf_f : romem -> function 
     (ANPC: an!!pc = (ne, nm))
     (ENV: eagree e te ne)
     (MEM: magree m tm (nlive ge sp nm)),
-  match_states transf_f_def transf_f (State s f (Vptr sp Ptrofs.zero) pc' e m)
+  match_states  transf_f (State s f (Vptr sp Ptrofs.zero) pc' e m)
                (State ts tf (Vptr sp Ptrofs.zero) pc' te tm).
 
 
 
-Instance : IncRef  (match_succ_states_stm transf_function).
+Instance : IncRef match_succ_states_stm.
 Proof.
   unfold match_succ_states_stm.
   repeat (unshelve eapply IncRefForall; intros).
@@ -733,7 +732,7 @@ Proof.
   - unfold is_monotone; intros ? ? Hprec; apply Hprec.
 Defined.
 
-Lemma match_succ_states : ir_mono (match_succ_states_stm transf_function) transf_function.
+Lemma match_succ_states : ir_mono match_succ_states_stm transf_function.
 Proof.
   simpl.
   intros s f sp pc e m ts tf te tm an pc' cu instr ne nm LINK STACKS FUN ANL INSTR SUCC ANPC ENV MEM.
@@ -913,12 +912,12 @@ Qed.
 (* UNTIL HERE : They remain the same *)
 
 
-Definition step_simulation_stm (transf_f : romem -> function -> res RTL_Incomplete.function) :=
+Definition step_simulation_pred (transf_f : romem -> function -> res RTL_Incomplete.function) :=
   forall S1 t S2, step ge S1 t S2 ->
-  forall S1', match_states transf_function transf_f S1 S1' -> sound_state prog S1 ->
-  exists S2', RTL_Incomplete.step tge S1' t S2' /\ match_states transf_function transf_f S2 S2'.
+  forall S1', match_states transf_f S1 S1' -> sound_state prog S1 ->
+  exists S2', RTL_Incomplete.step tge S1' t S2' /\ match_states transf_f S2 S2'.
 
-Lemma tolerant_step_simulation : ir_mono step_simulation_stm transf_function.
+Lemma inc_step_simulation : ir_mono step_simulation_pred transf_function.
 Proof. 
   simpl.
 Ltac TransfInstr :=
@@ -1373,18 +1372,18 @@ Qed.
 Theorem step_simulation:
   is_complete transf_function -> 
   forall S1 t S2, step ge S1 t S2 ->
-  forall S1', match_states transf_function transf_function S1 S1' -> sound_state prog S1 ->
-  exists S2', RTL_Incomplete.step tge S1' t S2' /\ match_states transf_function transf_function S2 S2'.
+  forall S1', match_states transf_function S1 S1' -> sound_state prog S1 ->
+  exists S2', RTL_Incomplete.step tge S1' t S2' /\ match_states transf_function S2 S2'.
 Proof.
   intros COMPLETE.
-  change (step_simulation_stm transf_function).
+  change (step_simulation_pred transf_function).
   rewrite <- complete_monotone_is_equivalent; eauto.
-  apply tolerant_step_simulation.
+  apply inc_step_simulation.
 Qed.
 
 Lemma transf_initial_states:
   forall st1, initial_state prog st1 ->
-  exists st2, initial_state tprog st2 /\ match_states transf_function transf_function st1 st2.
+  exists st2, initial_state tprog st2 /\ match_states transf_function st1 st2.
 Proof.
   intros. inversion H.
   exploit function_ptr_translated; eauto. intros (cu & tf & A & B & C).
@@ -1400,7 +1399,7 @@ Qed.
 
 Lemma transf_final_states:
   forall st1 st2 r,
-  match_states transf_function transf_function st1 st2 -> final_state st1 r -> final_state st2 r.
+  match_states transf_function st1 st2 -> final_state st1 r -> final_state st2 r.
 Proof.
   intros. inv H0. inv H. inv STACKS. inv RES. constructor.
 Qed.
