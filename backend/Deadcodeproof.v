@@ -491,8 +491,8 @@ Qed.
 
 (** * Semantic invariant *)
 
-
-
+Definition mono_eq A `{Refinable A} `{Complete A} a1 a2 := a2 ⊑ a1.
+Definition anti_eq A `{Refinable A} `{Complete A} a1 a2 := is_complete a1 /\ a1 = a2.
 
 Inductive match_stackframes_pred (R : res RTL_Incomplete.function -> res RTL_Incomplete.function -> Prop) (transf_f : romem -> function -> res RTL_Incomplete.function): stackframe -> stackframe -> Prop :=
   | match_stackframes_pred_intro:
@@ -509,13 +509,11 @@ Inductive match_stackframes_pred (R : res RTL_Incomplete.function -> res RTL_Inc
 
 Definition match_stackframes := @match_stackframes_pred eq.
 
-
-
 #[local, refine] 
 Instance IncRefMatchStackframes S1 S2 : IncRef (fun transf_f => match_stackframes transf_f S1 S2) :=
 { 
-  ir_mono := fun tf => match_stackframes_pred (fun x y => y ⊑ x) tf S1 S2 ;
-  ir_anti := fun tf => match_stackframes_pred (fun tf1 tf2 => is_complete tf1 /\ tf1 = tf2) tf S1 S2;
+  ir_mono := fun tf => match_stackframes_pred (mono_eq _) tf S1 S2 ;
+  ir_anti := fun tf => match_stackframes_pred (anti_eq _) tf S1 S2;
 }.
 Proof.
   - intros tf tf' Hprec MS; inv MS; econstructor; eauto.
@@ -527,7 +525,7 @@ Proof.
     specialize (Hprec (romem_for cu) f). eapply is_complete_minimal in Hprec; eauto.
     rewrite Hprec. split; eauto.
 
-  - intros tf MS. inv MS; econstructor; eauto. rewrite <- FUN. reflexivity.
+  - intros tf MS. inv MS; econstructor; eauto. unfold mono_eq. rewrite <- FUN. reflexivity.
     
   - intros tf MS; inv MS; econstructor; eauto. destruct FUN as [_ <-]. reflexivity.
 
@@ -574,8 +572,6 @@ forall s f sp pc e m ts tf te tm cu an
 
 Definition match_states := match_states_pred (fun A _ _ => eq).
 
-Definition mono_eq A `{Refinable A} `{Complete A} a1 a2 := a2 ⊑ a1.
-Definition anti_eq A `{Refinable A} `{Complete A} a1 a2 := is_complete a1 /\ a1 = a2.
 
 
 Lemma list_forall2_impl : forall {A B} {P Q : A -> B -> Prop} {l1 l2},
