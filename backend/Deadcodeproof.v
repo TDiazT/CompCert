@@ -644,15 +644,24 @@ Proof.
 Qed.
 
 
-Axiom (Hmono : is_monotone (@AST.transf_partial_fundef function RTL_Incomplete.function))
-      (Hcomplete : is_complete (@AST.transf_partial_fundef function RTL_Incomplete.function)).
+Lemma is_monotone_transf_partial_fundef  {A B} `{Refinable B} : is_monotone (@AST.transf_partial_fundef A B).
+Proof.
+  intros ? ? Hprec f. unfold transf_partial_fundef. destruct f; try reflexivity.
+  unfold bind. specialize (Hprec a).
+  destruct (a1 a), (a2 a); eauto.
+Qed.
+
+Lemma is_complete_transf_partial_fundef  {A B} `{Complete B} : is_complete (@AST.transf_partial_fundef A B).
+Proof.
+  intros f Hc. unfold transf_partial_fundef. intros a Hca.
+  destruct a; eauto.
+  unfold bind. specialize (Hc a Hca). destruct (f a); eauto.
+Qed.
 
 Lemma RTL_fundef_complete : forall f : fundef, is_complete f.
 Proof.
       intros. unfold_complete. destruct f; typeclasses eauto.
 Qed.
-
-
 
 #[local, refine] 
 Instance IncRefMatchStates S1 S2 : IncRef (fun transf_f => match_states transf_f S1 S2) :=
@@ -665,7 +674,7 @@ Proof.
     * unshelve eapply (list_forall2_impl _ STACKS). intros ? ? Hgms. unshelve eapply (gen_match_stackframes_ref _ Hgms). eauto.
     * eapply is_transitive; eauto; apply Hprec.
     * unshelve eapply (list_forall2_impl _ STACKS). intros ? ? Hgms; unshelve eapply (gen_match_stackframes_ref _ Hgms); eauto.
-    * eapply is_transitive; eauto. pose proof (Hmono _ _ (Hprec (romem_for cu))) as Hm.
+    * eapply is_transitive; eauto. pose proof (is_monotone_transf_partial_fundef _ _ (Hprec (romem_for cu))) as Hm.
       apply Hm.
     * unshelve eapply (list_forall2_impl _ STACKS). intros ? ? Hgms; unshelve eapply (gen_match_stackframes_ref _ Hgms); eauto.
 
@@ -675,7 +684,7 @@ Proof.
       specialize (Hprec (romem_for cu) f).
       eapply is_complete_minimal in Hprec; eauto. rewrite Hprec; eauto.
     * unshelve eapply (list_forall2_impl _ STACKS). intros ? ? Hgms; unshelve eapply (gen_match_stackframes_monotone_complete _ Hgms); eauto.
-    * destruct_ctx. pose proof (Hmono _ _ (Hprec (romem_for cu)) f) as Hm.
+    * destruct_ctx. pose proof (is_monotone_transf_partial_fundef _ _ (Hprec (romem_for cu)) f) as Hm.
       rewrite (is_complete_minimal _ FUN0 _ Hm); eauto.
     * unshelve eapply (list_forall2_impl _ STACKS). intros ? ? Hgms; unshelve eapply (gen_match_stackframes_monotone_complete _ Hgms); eauto.
 
@@ -704,14 +713,14 @@ Proof.
     * symmetry; apply is_complete_minimal; eauto; apply H; eauto.
     * unshelve eapply (list_forall2_impl _ STACKS). intros ? ? Hgms; unshelve eapply (gen_match_stackframes_ref_eq _ Hgms); eauto.
     * unshelve erewrite (is_complete_minimal _ _ _ FUN); eauto. 
-      apply Hcomplete; eauto. apply RTL_fundef_complete.
+      apply is_complete_transf_partial_fundef; eauto. apply RTL_fundef_complete.
     * unshelve eapply (list_forall2_impl _ STACKS). intros ? ? Hgms; unshelve eapply (gen_match_stackframes_ref_eq _ Hgms); eauto.
 
   - intros tf HC MS; inv MS; econstructor; eauto.
     * unshelve eapply (list_forall2_impl _ STACKS). intros ? ? Hgms; unshelve eapply (gen_match_stackframes_eq_complete_eq _ Hgms); eauto.
     * split; eauto. apply HC; eauto. 
     * unshelve eapply (list_forall2_impl _ STACKS). intros ? ? Hgms; unshelve eapply (gen_match_stackframes_eq_complete_eq _ Hgms); eauto.
-    * split; eauto. apply Hcomplete; eauto. apply RTL_fundef_complete.
+    * split; eauto. apply is_complete_transf_partial_fundef; eauto. apply RTL_fundef_complete.
     * unshelve eapply (list_forall2_impl _ STACKS). intros ? ? Hgms; unshelve eapply (gen_match_stackframes_eq_complete_eq _ Hgms); eauto.
 Defined.      
 
