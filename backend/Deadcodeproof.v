@@ -26,7 +26,7 @@ Lemma function_complete : forall f : function, is_complete f.
 easy.
 Qed.
 
-Hint Resolve function_complete.
+Hint Resolve function_complete : icp_ccert.
 
 (* Beginning of the file *)
 
@@ -530,10 +530,10 @@ Proof.
   - intros tf MS; inv MS; econstructor; eauto. destruct FUN as [_ <-]. reflexivity.
 
   - intros tf ? MS; inv MS; econstructor; eauto. symmetry.
-    apply is_complete_minimal; eauto. apply H; eauto.
+    apply is_complete_minimal; eauto. apply H; eauto with icp_ccert.
       
   - intros tf HC MS; inv MS; econstructor; eauto; split.
-    * apply HC; eauto.
+    * apply HC; eauto with icp_ccert.
     * rewrite FUN; reflexivity.
 Defined.
 
@@ -600,7 +600,7 @@ Lemma match_stackframes_pred_ref_eq:
 Proof.
   intros ? ? ? HC H; inv H; econstructor; eauto.
   symmetry; apply is_complete_minimal; eauto.
-  apply HC; eauto. 
+  apply HC; eauto with icp_ccert. 
 Qed.
 
 Lemma match_stackframes_pred_complete_eq_eq:
@@ -620,7 +620,7 @@ Lemma match_stackframes_pred_eq_complete_eq:
   forall {tf S1 S2}, is_complete tf -> match_stackframes_pred eq tf S1 S2 -> match_stackframes_pred (anti_eq _) tf S1 S2.
 Proof.
   intros ? ? ? HC H; inv H; econstructor; eauto; split; eauto.
-  apply HC; eauto. 
+  apply HC; eauto with icp_ccert.
 Qed.
 
 Lemma match_stackframes_pred_monotone_complete :
@@ -706,17 +706,17 @@ Proof.
 
    - intros tf ? MS; inv MS; econstructor; eauto; unfold mono_eq in *.
     * unshelve eapply (list_forall2_impl _ STACKS). intros ? ? Hgms; unshelve eapply (match_stackframes_pred_ref_eq _ Hgms); eauto.
-    * symmetry; apply is_complete_minimal; eauto; apply H; eauto.
+    * symmetry; apply is_complete_minimal; eauto; apply H; eauto with icp_ccert.
     * unshelve eapply (list_forall2_impl _ STACKS). intros ? ? Hgms; unshelve eapply (match_stackframes_pred_ref_eq _ Hgms); eauto.
     * unshelve erewrite (is_complete_minimal _ _ _ FUN); eauto. 
-      apply is_complete_transf_partial_fundef; eauto. apply RTL_fundef_complete.
+      apply is_complete_transf_partial_fundef; eauto with icp_ccert. apply RTL_fundef_complete.
     * unshelve eapply (list_forall2_impl _ STACKS). intros ? ? Hgms; unshelve eapply (match_stackframes_pred_ref_eq _ Hgms); eauto.
 
   - intros tf HC MS; inv MS; econstructor; eauto.
     * unshelve eapply (list_forall2_impl _ STACKS). intros ? ? Hgms; unshelve eapply (match_stackframes_pred_eq_complete_eq _ Hgms); eauto.
-    * split; eauto. apply HC; eauto. 
+    * split; eauto. apply HC; eauto with icp_ccert. 
     * unshelve eapply (list_forall2_impl _ STACKS). intros ? ? Hgms; unshelve eapply (match_stackframes_pred_eq_complete_eq _ Hgms); eauto.
-    * split; eauto. apply is_complete_transf_partial_fundef; eauto. apply RTL_fundef_complete.
+    * split; eauto. apply is_complete_transf_partial_fundef; eauto with icp_ccert. apply RTL_fundef_complete.
     * unshelve eapply (list_forall2_impl _ STACKS). intros ? ? Hgms; unshelve eapply (match_stackframes_pred_eq_complete_eq _ Hgms); eauto.
 Defined.      
 
@@ -755,7 +755,7 @@ Proof.
   unshelve eapply IncRefArrow.
   unshelve eapply IncRefArrow.
   unshelve eapply IncRefEqL.
-  - unfold_complete. intros ? Hc. apply Hc; eauto.
+  - unfold_complete. intros ? Hc. apply Hc; eauto with icp_ccert.
   - unfold is_monotone; intros ? ? Hprec; apply Hprec.
 Defined.
 

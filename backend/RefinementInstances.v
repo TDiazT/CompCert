@@ -6,6 +6,8 @@ Require Import Coqlib Maps Errors
                RTL RTL_Incomplete
                ValueDomain.
 
+Create HintDb icp_ccert.
+
 (* Destructs conjunctions, disjunctions, etc. *)
 Ltac destruct_ctx := 
   repeat (match goal with
@@ -292,13 +294,13 @@ Lemma romem_complete : forall r : romem, is_complete r.
 Proof. intros; unfold_complete; intros; unfold_complete; destruct (_ ! _); try unfold_complete; eauto. Qed.
 
 #[export]
-Hint Resolve romem_complete.
+Hint Resolve romem_complete : icp_ccert.
 
 Lemma romem_sp : forall r : romem, r ⊑ r. 
 Proof. intros; unfold_refinement; intros; unfold_refinement; destruct (_ ! _); try unfold_refinement; eauto. Qed.
 
 #[export]
-Hint Resolve romem_sp.
+Hint Resolve romem_sp : icp_ccert.
 
 #[export, refine] 
 Instance : Refinable function := 

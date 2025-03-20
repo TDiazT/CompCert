@@ -22,6 +22,7 @@ Tactic Notation "unfold_refinement" "in" hyp(H) := unfold refinement in H; cbn i
 
 #[export] Hint Extern 1 (refinement _ _) => unfold_refinement : typeclass_instances.
 #[export] Hint Extern 0 (refinement _ _) => eassumption : typeclass_instances.
+#[export] Hint Extern 0 (?t ⊑ ?t) => reflexivity : typeclass_instances.
 
 #[export] 
 Instance refinableTransitive {A} `{Refinable A} : Transitive refinement := { transitivity := is_transitive }.
@@ -29,7 +30,7 @@ Instance refinableTransitive {A} `{Refinable A} : Transitive refinement := { tra
 Instance refinableReflexive {A} `{Refinable A} : Reflexive refinement := { reflexivity := is_reflexive }.
 
 #[export] 
-Program Instance refinableFun {A B} `{Refinable A} `{Refinable B} : Refinable (A -> B) :=
+Program Instance refinableFun {A B} `{Refinable B} : Refinable (A -> B) :=
   {
     refinement f g := forall a, f a ⊑ g a ;
   }.
@@ -39,6 +40,8 @@ Qed.
 Next Obligation.
   red; intros; reflexivity. 
 Qed.
+
+#[export] Hint Extern 0 ((?f ?x) ⊑ (?g ?y)) => match goal with [H : ?f ⊑ ?g |- (?f ?x) ⊑ (?g ?y)] => apply H end : typeclass_instances.
 
 (***********************************)
 (*          Monotonous             *)
@@ -82,6 +85,7 @@ Instance completeFun {A B} `{Complete A} `{Complete B} : Complete (A -> B) :=
     is_complete f := forall a, is_complete a -> is_complete (f a) ;
   }.
 
+#[export] Hint Extern 0 (is_complete (?f ?x)) => match goal with [H : is_complete ?f |- is_complete (?f ?x)] => apply H end : typeclass_instances.
 
 Lemma apply_complete : forall {A B} `{Complete A} `{Complete B},
     forall a, is_complete a -> is_complete (fun f : A -> B => f a).
@@ -433,7 +437,7 @@ Proof.
 Defined.
 
 #[export] 
-Instance IncRefEq_fun {A} `{Refinable A} `{Complete A} 
+Instance IncRefEqFun {A} `{Refinable A} `{Complete A} 
   {B} `{Refinable B} 
   {C} `{Refinable C}
   (f g : A -> B -> C) {Hmono : IncRef (fun a => forall b, f a b = g a b)} 
