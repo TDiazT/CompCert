@@ -539,12 +539,12 @@ Proof.
     * rewrite FUN; reflexivity.
 Defined.
 
-Inductive gen_match_states  
+Inductive match_states_pred  
   (R : forall A `{Refinable A} `{Complete A}, A -> A -> Prop) 
   (transf_function  : romem -> function -> res RTL_Incomplete.function) :
     state -> RTL_Incomplete.state -> Prop := 
 
-| gen_match_regular_states:
+| match_regular_states_pred :
 forall s f sp pc e m ts tf te tm cu an
   (STACKS: list_forall2 (gen_match_stackframes (R _) transf_function ) s ts)
   (LINK: linkorder cu prog)
@@ -552,27 +552,27 @@ forall s f sp pc e m ts tf te tm cu an
   (ANL: analyze (vanalyze cu f) f = Some an)
   (ENV: eagree e te (fst (transfer f (vanalyze cu f) pc an!!pc)))
   (MEM: magree m tm (nlive ge sp (snd (transfer f (vanalyze cu f) pc an!!pc)))),
-  gen_match_states R transf_function  (State s f (Vptr sp Ptrofs.zero) pc e m) (State ts tf (Vptr sp Ptrofs.zero) pc te tm)
+  match_states_pred R transf_function  (State s f (Vptr sp Ptrofs.zero) pc e m) (State ts tf (Vptr sp Ptrofs.zero) pc te tm)
   
-| gen_match_call_states:
+| match_call_states_pred :
   forall s f args m ts tf targs tm cu
     (STACKS: list_forall2 (gen_match_stackframes (R _) transf_function ) s ts)
     (LINK: linkorder cu prog)
     (FUN: R _ (AST.transf_partial_fundef (transf_function (romem_for cu)) f) (OK tf))
     (ARGS: Val.lessdef_list args targs)
     (MEM: Mem.extends m tm),
-  gen_match_states R transf_function  (Callstate s f args m)
+  match_states_pred R transf_function  (Callstate s f args m)
                (Callstate ts tf targs tm)
 
-| gen_match_return_states:
+| match_return_states_pred :
   forall s v m ts tv tm
     (STACKS: list_forall2 (gen_match_stackframes (R _) transf_function ) s ts)
     (RES: Val.lessdef v tv)
     (MEM: Mem.extends m tm),
-  gen_match_states R transf_function  (Returnstate s v m)
+  match_states_pred R transf_function  (Returnstate s v m)
                (Returnstate ts tv tm).
 
-Definition match_states := gen_match_states (fun A _ _ => eq).
+Definition match_states := match_states_pred (fun A _ _ => eq).
 
 Definition mono_eq A `{Refinable A} `{Complete A} a1 a2 := a2 ⊑ a1.
 Definition anti_eq A `{Refinable A} `{Complete A} a1 a2 := is_complete a1 /\ a1 = a2.
@@ -657,8 +657,8 @@ Qed.
 #[local, refine] 
 Instance IncRefMatchStates S1 S2 : IncRef (fun transf_f => match_states transf_f S1 S2) :=
 { 
-  ir_mono := fun tf => gen_match_states mono_eq tf S1 S2 ;
-  ir_anti := fun tf => gen_match_states anti_eq tf S1 S2;
+  ir_mono := fun tf => match_states_pred mono_eq tf S1 S2 ;
+  ir_anti := fun tf => match_states_pred anti_eq tf S1 S2;
 }.
 Proof.
   - intros tf tf' Hprec MS; inv MS; econstructor; eauto.
@@ -1102,7 +1102,7 @@ Ltac UseTransfer :=
   exploit find_function_translated; eauto 2 with na. intros (cu' & tfd & A & B & C).
   econstructor; split.
   eapply RTL_Incomplete.exec_Icall; eauto. eapply sig_function_translated; eauto.
-  eapply gen_match_call_states with (cu := cu'); eauto.
+  eapply match_call_states_pred with (cu := cu'); eauto.
   (* new case *)
   unfold_complete in COMPLETE_TPROG. destruct COMPLETE_TPROG as [COMPLETE_TPROG' _]. specialize (COMPLETE_TPROG' ros te). unfold tge in A. erewrite A in COMPLETE_TPROG'. eauto.
   
@@ -1129,7 +1129,7 @@ Ltac UseTransfer :=
   econstructor; split.
   eapply RTL_Incomplete.exec_Itailcall; eauto. eapply sig_function_translated; eauto.
   erewrite stacksize_translated by eauto. eexact C.
-  eapply gen_match_call_states with (cu := cu'); eauto 2 with na.
+  eapply match_call_states_pred with (cu := cu'); eauto 2 with na.
   (* new case *)
   unfold_complete in COMPLETE_TPROG. destruct COMPLETE_TPROG as [COMPLETE_TPROG' _]. specialize (COMPLETE_TPROG' ros te). unfold tge in A. erewrite A in COMPLETE_TPROG'. eauto.
   eapply list_forall2_impl; [| eauto]. intros; eapply gen_match_stackframes_complete_monotone; eauto.
@@ -1463,9 +1463,9 @@ RTL_Incomplete to RTL, preserving several properties.
 
 
 One thing that it requires in particular, is the addition of an `is_complete` premise in the 
-`gen_match_call_states` constructor of `gen_match_states` (currently commented out).
+`gen_match_call_states` constructor of `match_states_pred` (currently commented out).
 This needs to be propagated to related definitions, such as `gen_match_succ_states`.
-In total, one needs to add the following parameter to `gen_match_states` and arg to the constructor:
+In total, one needs to add the following parameter to `match_states_pred` and arg to the constructor:
 `{Complete (@fundef_ B)}
 is_complete tf 
 
