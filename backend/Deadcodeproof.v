@@ -494,8 +494,8 @@ Qed.
 
 
 
-Inductive gen_match_stackframes (R : res RTL_Incomplete.function -> res RTL_Incomplete.function -> Prop) (transf_f : romem -> function -> res RTL_Incomplete.function): stackframe -> stackframe -> Prop :=
-  | gen_match_stackframes_intro:
+Inductive match_stackframes_pred (R : res RTL_Incomplete.function -> res RTL_Incomplete.function -> Prop) (transf_f : romem -> function -> res RTL_Incomplete.function): stackframe -> stackframe -> Prop :=
+  | match_stackframes_pred_intro:
       forall res f sp pc e tf te cu an
         (LINK: linkorder cu prog)
         (FUN: R (transf_f (romem_for cu) f) (OK tf))
@@ -504,18 +504,18 @@ Inductive gen_match_stackframes (R : res RTL_Incomplete.function -> res RTL_Inco
               Val.lessdef v tv ->
               eagree (e#res <- v) (te#res<- tv)
                      (fst (transfer f (vanalyze cu f) pc an!!pc))),
-      gen_match_stackframes R transf_f (Stackframe res f (Vptr sp Ptrofs.zero) pc e)
+      match_stackframes_pred R transf_f (Stackframe res f (Vptr sp Ptrofs.zero) pc e)
                         (Stackframe res tf (Vptr sp Ptrofs.zero) pc te).
 
-Definition match_stackframes := @gen_match_stackframes eq.
+Definition match_stackframes := @match_stackframes_pred eq.
 
 
 
 #[local, refine] 
 Instance monoMatchStackframes S1 S2 : IncRef (fun transf_f => match_stackframes transf_f S1 S2) :=
 { 
-  ir_mono := fun tf => gen_match_stackframes (fun x y => y ⊑ x) tf S1 S2 ;
-  ir_anti := fun tf => gen_match_stackframes (fun tf1 tf2 => is_complete tf1 /\ tf1 = tf2) tf S1 S2;
+  ir_mono := fun tf => match_stackframes_pred (fun x y => y ⊑ x) tf S1 S2 ;
+  ir_anti := fun tf => match_stackframes_pred (fun tf1 tf2 => is_complete tf1 /\ tf1 = tf2) tf S1 S2;
 }.
 Proof.
   - intros tf tf' Hprec MS; inv MS; econstructor; eauto.
@@ -546,7 +546,7 @@ Inductive match_states_pred
 
 | match_regular_states_pred :
 forall s f sp pc e m ts tf te tm cu an
-  (STACKS: list_forall2 (gen_match_stackframes (R _) transf_function ) s ts)
+  (STACKS: list_forall2 (match_stackframes_pred (R _) transf_function ) s ts)
   (LINK: linkorder cu prog)
   (FUN: R _ (transf_function  (romem_for cu) f) (OK tf))
   (ANL: analyze (vanalyze cu f) f = Some an)
@@ -556,7 +556,7 @@ forall s f sp pc e m ts tf te tm cu an
   
 | match_call_states_pred :
   forall s f args m ts tf targs tm cu
-    (STACKS: list_forall2 (gen_match_stackframes (R _) transf_function ) s ts)
+    (STACKS: list_forall2 (match_stackframes_pred (R _) transf_function ) s ts)
     (LINK: linkorder cu prog)
     (FUN: R _ (AST.transf_partial_fundef (transf_function (romem_for cu)) f) (OK tf))
     (ARGS: Val.lessdef_list args targs)
@@ -566,7 +566,7 @@ forall s f sp pc e m ts tf te tm cu an
 
 | match_return_states_pred :
   forall s v m ts tv tm
-    (STACKS: list_forall2 (gen_match_stackframes (R _) transf_function ) s ts)
+    (STACKS: list_forall2 (match_stackframes_pred (R _) transf_function ) s ts)
     (RES: Val.lessdef v tv)
     (MEM: Mem.extends m tm),
   match_states_pred R transf_function  (Returnstate s v m)
@@ -593,42 +593,42 @@ Proof.
 (* Qed. *)
 Abort.
 
-Lemma gen_match_stackframes_ref:
-  forall {tf tf' S1 S2}, tf ⊑ tf' -> gen_match_stackframes (mono_eq _) tf S1 S2 -> gen_match_stackframes (mono_eq _) tf' S1 S2.
+Lemma match_stackframes_pred_ref:
+  forall {tf tf' S1 S2}, tf ⊑ tf' -> match_stackframes_pred (mono_eq _) tf S1 S2 -> match_stackframes_pred (mono_eq _) tf' S1 S2.
 Proof.
   intros ? ? ? ? Hpred H. inv H. econstructor; eauto. eapply is_transitive; eauto. apply Hpred; eauto.
 Qed.
 
-Lemma gen_match_stackframes_ref_eq:
-  forall {tf S1 S2}, is_complete tf -> gen_match_stackframes (mono_eq _) tf S1 S2 -> gen_match_stackframes eq tf S1 S2.
+Lemma match_stackframes_pred_ref_eq:
+  forall {tf S1 S2}, is_complete tf -> match_stackframes_pred (mono_eq _) tf S1 S2 -> match_stackframes_pred eq tf S1 S2.
 Proof.
   intros ? ? ? HC H; inv H; econstructor; eauto.
   symmetry; apply is_complete_minimal; eauto.
   apply HC; eauto. 
 Qed.
 
-Lemma gen_match_stackframes_complete_eq_eq:
-  forall {tf S1 S2}, gen_match_stackframes (anti_eq _) tf S1 S2 -> gen_match_stackframes eq tf S1 S2.
+Lemma match_stackframes_pred_complete_eq_eq:
+  forall {tf S1 S2}, match_stackframes_pred (anti_eq _) tf S1 S2 -> match_stackframes_pred eq tf S1 S2.
 Proof.
   intros ? ? ? H; inv H; econstructor; eauto; destruct FUN; eauto.
 Qed.
 
-Lemma gen_match_stackframes_eq_ref :
-  forall {tf S1 S2}, gen_match_stackframes eq tf S1 S2 -> gen_match_stackframes (mono_eq _) tf S1 S2.
+Lemma match_stackframes_pred_eq_ref :
+  forall {tf S1 S2}, match_stackframes_pred eq tf S1 S2 -> match_stackframes_pred (mono_eq _) tf S1 S2.
 Proof.
   intros ? ? ? H; inv H; econstructor; eauto.
   unfold mono_eq; rewrite <- FUN. reflexivity.
 Qed.
     
-Lemma gen_match_stackframes_eq_complete_eq:
-  forall {tf S1 S2}, is_complete tf -> gen_match_stackframes eq tf S1 S2 -> gen_match_stackframes (anti_eq _) tf S1 S2.
+Lemma match_stackframes_pred_eq_complete_eq:
+  forall {tf S1 S2}, is_complete tf -> match_stackframes_pred eq tf S1 S2 -> match_stackframes_pred (anti_eq _) tf S1 S2.
 Proof.
   intros ? ? ? HC H; inv H; econstructor; eauto; split; eauto.
   apply HC; eauto. 
 Qed.
 
-Lemma gen_match_stackframes_monotone_complete :
-  forall {tf tf' S1 S2}, tf ⊑ tf' -> gen_match_stackframes (anti_eq _) tf' S1 S2 -> gen_match_stackframes (anti_eq _) tf S1 S2.
+Lemma match_stackframes_pred_monotone_complete :
+  forall {tf tf' S1 S2}, tf ⊑ tf' -> match_stackframes_pred (anti_eq _) tf' S1 S2 -> match_stackframes_pred (anti_eq _) tf S1 S2.
 Proof.
   intros ? ? ? ? Hprec H. inv H. econstructor; eauto. unfold anti_eq in *. destruct_ctx.
   unfold_refinement in Hprec.
@@ -636,8 +636,8 @@ Proof.
   eapply is_complete_minimal in Hprec; eauto. rewrite Hprec; eauto.
 Qed.
 
-Lemma gen_match_stackframes_complete_monotone :
-  forall {tf S1 S2}, gen_match_stackframes (anti_eq _) tf S1 S2 -> gen_match_stackframes (mono_eq _) tf S1 S2.
+Lemma match_stackframes_pred_complete_monotone :
+  forall {tf S1 S2}, match_stackframes_pred (anti_eq _) tf S1 S2 -> match_stackframes_pred (mono_eq _) tf S1 S2.
 Proof.
   intros ? ? ? H.  inv H. econstructor; eauto. unfold mono_eq, anti_eq in *. destruct FUN as [? FUN].
   rewrite <- FUN. reflexivity.
@@ -671,57 +671,57 @@ Instance IncRefMatchStates S1 S2 : IncRef (fun transf_f => match_states transf_f
 }.
 Proof.
   - intros tf tf' Hprec MS; inv MS; econstructor; eauto.
-    * unshelve eapply (list_forall2_impl _ STACKS). intros ? ? Hgms. unshelve eapply (gen_match_stackframes_ref _ Hgms). eauto.
+    * unshelve eapply (list_forall2_impl _ STACKS). intros ? ? Hgms. unshelve eapply (match_stackframes_pred_ref _ Hgms). eauto.
     * eapply is_transitive; eauto; apply Hprec.
-    * unshelve eapply (list_forall2_impl _ STACKS). intros ? ? Hgms; unshelve eapply (gen_match_stackframes_ref _ Hgms); eauto.
+    * unshelve eapply (list_forall2_impl _ STACKS). intros ? ? Hgms; unshelve eapply (match_stackframes_pred_ref _ Hgms); eauto.
     * eapply is_transitive; eauto. pose proof (is_monotone_transf_partial_fundef _ _ (Hprec (romem_for cu))) as Hm.
       apply Hm.
-    * unshelve eapply (list_forall2_impl _ STACKS). intros ? ? Hgms; unshelve eapply (gen_match_stackframes_ref _ Hgms); eauto.
+    * unshelve eapply (list_forall2_impl _ STACKS). intros ? ? Hgms; unshelve eapply (match_stackframes_pred_ref _ Hgms); eauto.
 
   - intros tf tf' Hprec MS; inv MS; econstructor; eauto; unfold anti_eq in *.
-    * unshelve eapply (list_forall2_impl _ STACKS). intros ? ? Hgms; unshelve eapply (gen_match_stackframes_monotone_complete _ Hgms); eauto.
+    * unshelve eapply (list_forall2_impl _ STACKS). intros ? ? Hgms; unshelve eapply (match_stackframes_pred_monotone_complete _ Hgms); eauto.
     * unfold_refinement in Hprec. destruct_ctx.
       specialize (Hprec (romem_for cu) f).
       eapply is_complete_minimal in Hprec; eauto. rewrite Hprec; eauto.
-    * unshelve eapply (list_forall2_impl _ STACKS). intros ? ? Hgms; unshelve eapply (gen_match_stackframes_monotone_complete _ Hgms); eauto.
+    * unshelve eapply (list_forall2_impl _ STACKS). intros ? ? Hgms; unshelve eapply (match_stackframes_pred_monotone_complete _ Hgms); eauto.
     * destruct_ctx. pose proof (is_monotone_transf_partial_fundef _ _ (Hprec (romem_for cu)) f) as Hm.
       rewrite (is_complete_minimal _ FUN0 _ Hm); eauto.
-    * unshelve eapply (list_forall2_impl _ STACKS). intros ? ? Hgms; unshelve eapply (gen_match_stackframes_monotone_complete _ Hgms); eauto.
+    * unshelve eapply (list_forall2_impl _ STACKS). intros ? ? Hgms; unshelve eapply (match_stackframes_pred_monotone_complete _ Hgms); eauto.
 
   - intros tf MS; inv MS; econstructor; eauto; unfold mono_eq in *.
     * unshelve eapply (list_forall2_impl _ STACKS). intros ? ? Hgms.
-      apply (gen_match_stackframes_eq_ref Hgms); eauto.
+      apply (match_stackframes_pred_eq_ref Hgms); eauto.
     * rewrite FUN. reflexivity.
     * unshelve eapply (list_forall2_impl _ STACKS). intros ? ? Hgms.
-      apply (gen_match_stackframes_eq_ref Hgms); eauto.
+      apply (match_stackframes_pred_eq_ref Hgms); eauto.
     * rewrite FUN. reflexivity.
     * unshelve eapply (list_forall2_impl _ STACKS). intros ? ? Hgms.
-      apply (gen_match_stackframes_eq_ref Hgms); eauto.
+      apply (match_stackframes_pred_eq_ref Hgms); eauto.
     
   - intros tf MS; inv MS; econstructor; eauto; unfold anti_eq in *.
     * unshelve eapply (list_forall2_impl _ STACKS). intros ? ? Hgms.
-      eapply (gen_match_stackframes_complete_eq_eq Hgms); eauto.
+      eapply (match_stackframes_pred_complete_eq_eq Hgms); eauto.
     * destruct FUN; eauto.
     * unshelve eapply (list_forall2_impl _ STACKS). intros ? ? Hgms.
-      eapply (gen_match_stackframes_complete_eq_eq Hgms); eauto.
+      eapply (match_stackframes_pred_complete_eq_eq Hgms); eauto.
     * destruct FUN; eauto.
     * unshelve eapply (list_forall2_impl _ STACKS). intros ? ? Hgms.
-      eapply (gen_match_stackframes_complete_eq_eq Hgms); eauto.
+      eapply (match_stackframes_pred_complete_eq_eq Hgms); eauto.
 
    - intros tf ? MS; inv MS; econstructor; eauto; unfold mono_eq in *.
-    * unshelve eapply (list_forall2_impl _ STACKS). intros ? ? Hgms; unshelve eapply (gen_match_stackframes_ref_eq _ Hgms); eauto.
+    * unshelve eapply (list_forall2_impl _ STACKS). intros ? ? Hgms; unshelve eapply (match_stackframes_pred_ref_eq _ Hgms); eauto.
     * symmetry; apply is_complete_minimal; eauto; apply H; eauto.
-    * unshelve eapply (list_forall2_impl _ STACKS). intros ? ? Hgms; unshelve eapply (gen_match_stackframes_ref_eq _ Hgms); eauto.
+    * unshelve eapply (list_forall2_impl _ STACKS). intros ? ? Hgms; unshelve eapply (match_stackframes_pred_ref_eq _ Hgms); eauto.
     * unshelve erewrite (is_complete_minimal _ _ _ FUN); eauto. 
       apply is_complete_transf_partial_fundef; eauto. apply RTL_fundef_complete.
-    * unshelve eapply (list_forall2_impl _ STACKS). intros ? ? Hgms; unshelve eapply (gen_match_stackframes_ref_eq _ Hgms); eauto.
+    * unshelve eapply (list_forall2_impl _ STACKS). intros ? ? Hgms; unshelve eapply (match_stackframes_pred_ref_eq _ Hgms); eauto.
 
   - intros tf HC MS; inv MS; econstructor; eauto.
-    * unshelve eapply (list_forall2_impl _ STACKS). intros ? ? Hgms; unshelve eapply (gen_match_stackframes_eq_complete_eq _ Hgms); eauto.
+    * unshelve eapply (list_forall2_impl _ STACKS). intros ? ? Hgms; unshelve eapply (match_stackframes_pred_eq_complete_eq _ Hgms); eauto.
     * split; eauto. apply HC; eauto. 
-    * unshelve eapply (list_forall2_impl _ STACKS). intros ? ? Hgms; unshelve eapply (gen_match_stackframes_eq_complete_eq _ Hgms); eauto.
+    * unshelve eapply (list_forall2_impl _ STACKS). intros ? ? Hgms; unshelve eapply (match_stackframes_pred_eq_complete_eq _ Hgms); eauto.
     * split; eauto. apply is_complete_transf_partial_fundef; eauto. apply RTL_fundef_complete.
-    * unshelve eapply (list_forall2_impl _ STACKS). intros ? ? Hgms; unshelve eapply (gen_match_stackframes_eq_complete_eq _ Hgms); eauto.
+    * unshelve eapply (list_forall2_impl _ STACKS). intros ? ? Hgms; unshelve eapply (match_stackframes_pred_eq_complete_eq _ Hgms); eauto.
 Defined.      
 
 Lemma analyze_successors:
@@ -774,7 +774,7 @@ Proof.
    (* rewrite ANPC; simpl. intros [A B]. *)
   econstructor; eauto; unfold mono_eq, anti_eq in *.
   (* START NEW : Changes from original proof *)
-  - eapply list_forall2_impl; [|eauto]. intros; eapply gen_match_stackframes_complete_monotone; eauto.
+  - eapply list_forall2_impl; [|eauto]. intros; eapply match_stackframes_pred_complete_monotone; eauto.
   - rewrite <- H0. reflexivity.
   (* END NEW *)
   - eapply eagree_ge; eauto.
@@ -1115,7 +1115,7 @@ Ltac UseTransfer :=
   (* new case *)
   unfold_complete in COMPLETE_TPROG. destruct COMPLETE_TPROG as [COMPLETE_TPROG' _]. specialize (COMPLETE_TPROG' ros te). unfold tge in A. erewrite A in COMPLETE_TPROG'. eauto.
   
-  constructor; auto. eapply gen_match_stackframes_intro with (cu := cu); eauto.
+  constructor; auto. eapply match_stackframes_pred_intro with (cu := cu); eauto.
   (* new case *) 
   rewrite <- FUN. reflexivity.
   intros.
@@ -1123,7 +1123,7 @@ Ltac UseTransfer :=
   eapply eagree_ge; eauto. rewrite ANPC. simpl.
   apply eagree_update; eauto with na.
   (* new case *) 
-  eapply list_forall2_impl; [| eauto]. intros; eapply gen_match_stackframes_complete_monotone; eauto.
+  eapply list_forall2_impl; [| eauto]. intros; eapply match_stackframes_pred_complete_monotone; eauto.
   rewrite B. reflexivity.
   eauto 2 with na.
   eapply magree_extends; eauto. apply nlive_all.
@@ -1141,7 +1141,7 @@ Ltac UseTransfer :=
   eapply match_call_states_pred with (cu := cu'); eauto 2 with na.
   (* new case *)
   unfold_complete in COMPLETE_TPROG. destruct COMPLETE_TPROG as [COMPLETE_TPROG' _]. specialize (COMPLETE_TPROG' ros te). unfold tge in A. erewrite A in COMPLETE_TPROG'. eauto.
-  eapply list_forall2_impl; [| eauto]. intros; eapply gen_match_stackframes_complete_monotone; eauto.
+  eapply list_forall2_impl; [| eauto]. intros; eapply match_stackframes_pred_complete_monotone; eauto.
   rewrite B. unfold mono_eq. reflexivity.
   eapply magree_extends; eauto. apply nlive_all.
 
@@ -1358,7 +1358,7 @@ Ltac UseTransfer :=
   erewrite stacksize_translated by eauto. eexact A.
   constructor; auto.
   (* forall2 *)
-  eapply list_forall2_impl; [| eauto]. intros; eapply gen_match_stackframes_complete_monotone; eauto.
+  eapply list_forall2_impl; [| eauto]. intros; eapply match_stackframes_pred_complete_monotone; eauto.
   destruct or; simpl; eauto 2 with na.
   eapply magree_extends; eauto. apply nlive_all.
 
@@ -1372,7 +1372,7 @@ Ltac UseTransfer :=
   econstructor; simpl; eauto.
   simpl. econstructor; eauto. 
   (* new case *)
-  eapply list_forall2_impl; [| eauto]. intros; eapply gen_match_stackframes_complete_monotone; eauto.
+  eapply list_forall2_impl; [| eauto]. intros; eapply match_stackframes_pred_complete_monotone; eauto.
   fold (transf_function (romem_for cu) f).
   rewrite EQ. reflexivity.
   apply eagree_init_regs; auto.
@@ -1387,7 +1387,7 @@ Ltac UseTransfer :=
   econstructor; eauto.
   eapply external_call_symbols_preserved; eauto. apply senv_preserved.
   econstructor; eauto. 
-  eapply list_forall2_impl; [| eauto]. intros; eapply gen_match_stackframes_complete_monotone; eauto.
+  eapply list_forall2_impl; [| eauto]. intros; eapply match_stackframes_pred_complete_monotone; eauto.
 
 - (* return *)
   inv STACKS. inv H1.
@@ -1396,7 +1396,7 @@ Ltac UseTransfer :=
   constructor.
   econstructor; eauto.
   (* forall2 *)
-  eapply list_forall2_impl; [| eauto]. intros; eapply gen_match_stackframes_complete_monotone; eauto.
+  eapply list_forall2_impl; [| eauto]. intros; eapply match_stackframes_pred_complete_monotone; eauto.
   unfold mono_eq. rewrite <- FUN. reflexivity.
   apply mextends_agree; auto.
 Qed.
@@ -1722,9 +1722,9 @@ Section TRANSF_PROGRAM_CORRECT.
   Qed.
 
   Lemma stakeframe_inversion s ts :
-    gen_match_stackframes prog eq transf_function s ts ->
+    match_stackframes_pred prog eq transf_function s ts ->
     exists ts', 
-    gen_match_stackframes prog eq transf_function_complete s ts' /\
+    match_stackframes_pred prog eq transf_function_complete s ts' /\
     ts = map_stackframe to_RTL_Incomplete_function ts'.
     Proof.
       inversion 1; subst; eauto. pose proof (FUN' := FUN).
@@ -1734,9 +1734,9 @@ Section TRANSF_PROGRAM_CORRECT.
     Qed. 
 
   Lemma stakeframes_inversion s ts :
-    list_forall2 (gen_match_stackframes prog eq transf_function) s ts ->
+    list_forall2 (match_stackframes_pred prog eq transf_function) s ts ->
     exists ts', 
-    list_forall2 (gen_match_stackframes prog eq transf_function_complete) s ts' /\
+    list_forall2 (match_stackframes_pred prog eq transf_function_complete) s ts' /\
     ts = map (map_stackframe to_RTL_Incomplete_function) ts'.
   Proof.
     induction 1.
