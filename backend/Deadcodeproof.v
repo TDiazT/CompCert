@@ -540,43 +540,42 @@ Proof.
 Defined.
 
 Inductive gen_match_states  
-  (R : res RTL_Incomplete.function -> res RTL_Incomplete.function -> Prop) 
-  (R2 : res RTL_Incomplete.fundef -> res RTL_Incomplete.fundef -> Prop)
+  (R : forall A `{Refinable A} `{Complete A}, A -> A -> Prop) 
   (transf_function  : romem -> function -> res RTL_Incomplete.function) :
     state -> RTL_Incomplete.state -> Prop := 
 
 | gen_match_regular_states:
 forall s f sp pc e m ts tf te tm cu an
-  (STACKS: list_forall2 (gen_match_stackframes R transf_function ) s ts)
+  (STACKS: list_forall2 (gen_match_stackframes (R _) transf_function ) s ts)
   (LINK: linkorder cu prog)
-  (FUN: R (transf_function  (romem_for cu) f) (OK tf))
+  (FUN: R _ (transf_function  (romem_for cu) f) (OK tf))
   (ANL: analyze (vanalyze cu f) f = Some an)
   (ENV: eagree e te (fst (transfer f (vanalyze cu f) pc an!!pc)))
   (MEM: magree m tm (nlive ge sp (snd (transfer f (vanalyze cu f) pc an!!pc)))),
-  gen_match_states R R2 transf_function  (State s f (Vptr sp Ptrofs.zero) pc e m) (State ts tf (Vptr sp Ptrofs.zero) pc te tm)
+  gen_match_states R transf_function  (State s f (Vptr sp Ptrofs.zero) pc e m) (State ts tf (Vptr sp Ptrofs.zero) pc te tm)
   
 | gen_match_call_states:
   forall s f args m ts tf targs tm cu
-    (STACKS: list_forall2 (gen_match_stackframes R transf_function ) s ts)
+    (STACKS: list_forall2 (gen_match_stackframes (R _) transf_function ) s ts)
     (LINK: linkorder cu prog)
-    (FUN: R2 (AST.transf_partial_fundef (transf_function (romem_for cu)) f) (OK tf))
+    (FUN: R _ (AST.transf_partial_fundef (transf_function (romem_for cu)) f) (OK tf))
     (ARGS: Val.lessdef_list args targs)
     (MEM: Mem.extends m tm),
-  gen_match_states R R2 transf_function  (Callstate s f args m)
+  gen_match_states R transf_function  (Callstate s f args m)
                (Callstate ts tf targs tm)
 
 | gen_match_return_states:
   forall s v m ts tv tm
-    (STACKS: list_forall2 (gen_match_stackframes R transf_function ) s ts)
+    (STACKS: list_forall2 (gen_match_stackframes (R _) transf_function ) s ts)
     (RES: Val.lessdef v tv)
     (MEM: Mem.extends m tm),
-  gen_match_states R R2 transf_function  (Returnstate s v m)
+  gen_match_states R transf_function  (Returnstate s v m)
                (Returnstate ts tv tm).
 
-Definition match_states := gen_match_states eq eq.
+Definition match_states := gen_match_states (fun A _ _ => eq).
 
-Definition mono_eq {A} `{Refinable A} a1 a2 := a2 ⊑ a1.
-Definition anti_eq {A} `{Refinable A} `{Complete A} a1 a2 := is_complete a1 /\ a1 = a2.
+Definition mono_eq A `{Refinable A} `{Complete A} a1 a2 := a2 ⊑ a1.
+Definition anti_eq A `{Refinable A} `{Complete A} a1 a2 := is_complete a1 /\ a1 = a2.
 
 
 Lemma list_forall2_impl : forall {A B} {P Q : A -> B -> Prop} {l1 l2},
@@ -595,13 +594,13 @@ Proof.
 Abort.
 
 Lemma gen_match_stackframes_ref:
-  forall {tf tf' S1 S2}, tf ⊑ tf' -> gen_match_stackframes mono_eq tf S1 S2 -> gen_match_stackframes mono_eq tf' S1 S2.
+  forall {tf tf' S1 S2}, tf ⊑ tf' -> gen_match_stackframes (mono_eq _) tf S1 S2 -> gen_match_stackframes (mono_eq _) tf' S1 S2.
 Proof.
   intros. inv H0. econstructor; eauto. eapply is_transitive; eauto. apply H; eauto.
 Qed.
 
 Lemma gen_match_stackframes_ref_eq:
-  forall {tf S1 S2}, is_complete tf -> gen_match_stackframes mono_eq tf S1 S2 -> gen_match_stackframes eq tf S1 S2.
+  forall {tf S1 S2}, is_complete tf -> gen_match_stackframes (mono_eq _) tf S1 S2 -> gen_match_stackframes eq tf S1 S2.
 Proof.
   intros ? ? ? HC H; inv H; econstructor; eauto.
   symmetry; apply is_complete_minimal; eauto.
@@ -609,27 +608,27 @@ Proof.
 Qed.
 
 Lemma gen_match_stackframes_complete_eq_eq:
-  forall {tf S1 S2}, gen_match_stackframes anti_eq tf S1 S2 -> gen_match_stackframes eq tf S1 S2.
+  forall {tf S1 S2}, gen_match_stackframes (anti_eq _) tf S1 S2 -> gen_match_stackframes eq tf S1 S2.
 Proof.
   intros ? ? ? H; inv H; econstructor; eauto; destruct FUN; eauto.
 Qed.
 
 Lemma gen_match_stackframes_eq_ref :
-  forall {tf S1 S2}, gen_match_stackframes eq tf S1 S2 -> gen_match_stackframes mono_eq tf S1 S2.
+  forall {tf S1 S2}, gen_match_stackframes eq tf S1 S2 -> gen_match_stackframes (mono_eq _) tf S1 S2.
 Proof.
   intros ? ? ? H; inv H; econstructor; eauto.
   unfold mono_eq; rewrite <- FUN. reflexivity.
 Qed.
     
 Lemma gen_match_stackframes_eq_complete_eq:
-  forall {tf S1 S2}, is_complete tf -> gen_match_stackframes eq tf S1 S2 -> gen_match_stackframes anti_eq tf S1 S2.
+  forall {tf S1 S2}, is_complete tf -> gen_match_stackframes eq tf S1 S2 -> gen_match_stackframes (anti_eq _) tf S1 S2.
 Proof.
   intros ? ? ? HC H; inv H; econstructor; eauto; split; eauto.
   apply HC; eauto. 
 Qed.
 
 Lemma gen_match_stackframes_monotone_complete :
-  forall {tf tf' S1 S2}, tf ⊑ tf' -> gen_match_stackframes anti_eq tf' S1 S2 -> gen_match_stackframes anti_eq tf S1 S2.
+  forall {tf tf' S1 S2}, tf ⊑ tf' -> gen_match_stackframes (anti_eq _) tf' S1 S2 -> gen_match_stackframes (anti_eq _) tf S1 S2.
 Proof.
   intros. inv H0. econstructor; eauto. unfold anti_eq in *. destruct_ctx.
   unfold_refinement in H.
@@ -638,7 +637,7 @@ Proof.
 Qed.
 
 Lemma gen_match_stackframes_complete_monotone :
-  forall {tf S1 S2}, gen_match_stackframes anti_eq tf S1 S2 -> gen_match_stackframes mono_eq tf S1 S2.
+  forall {tf S1 S2}, gen_match_stackframes (anti_eq _) tf S1 S2 -> gen_match_stackframes (mono_eq _) tf S1 S2.
 Proof.
   intros.  inv H. econstructor; eauto. unfold mono_eq, anti_eq in *. destruct_ctx.
   rewrite <- FUN1. reflexivity.
@@ -658,8 +657,8 @@ Qed.
 #[local, refine] 
 Instance IncRefMatchStates S1 S2 : IncRef (fun transf_f => match_states transf_f S1 S2) :=
 { 
-  ir_mono := fun tf => gen_match_states mono_eq mono_eq tf S1 S2 ;
-  ir_anti := fun tf => gen_match_states anti_eq anti_eq tf S1 S2;
+  ir_mono := fun tf => gen_match_states mono_eq tf S1 S2 ;
+  ir_anti := fun tf => gen_match_states anti_eq tf S1 S2;
 }.
 Proof.
   - intros tf tf' Hprec MS; inv MS; econstructor; eauto.
