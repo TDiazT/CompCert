@@ -512,8 +512,8 @@ Definition match_stackframes := @match_stackframes_pred eq.
 #[local, refine] 
 Instance IncRefMatchStackframes S1 S2 : IncRef (fun transf_f => match_stackframes transf_f S1 S2) :=
 { 
-  ir_mono := fun tf => match_stackframes_pred (mono_eq _) tf S1 S2 ;
-  ir_anti := fun tf => match_stackframes_pred (anti_eq _) tf S1 S2;
+  ir_mono tf := match_stackframes_pred (mono_eq _) tf S1 S2 ;
+  ir_anti tf := match_stackframes_pred (anti_eq _) tf S1 S2;
 }.
 Proof.
   - intros tf tf' Hprec MS; inv MS; econstructor; eauto.
@@ -662,8 +662,8 @@ Qed.
 #[local, refine] 
 Instance IncRefMatchStates S1 S2 : IncRef (fun transf_f => match_states transf_f S1 S2) :=
 { 
-  ir_mono := fun tf => match_states_pred mono_eq tf S1 S2 ;
-  ir_anti := fun tf => match_states_pred anti_eq tf S1 S2;
+  ir_mono tf := match_states_pred mono_eq tf S1 S2 ;
+  ir_anti tf := match_states_pred anti_eq tf S1 S2;
 }.
 Proof.
   - intros tf tf' Hprec MS; inv MS; econstructor; eauto.
