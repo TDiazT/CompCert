@@ -596,7 +596,7 @@ Abort.
 Lemma gen_match_stackframes_ref:
   forall {tf tf' S1 S2}, tf ⊑ tf' -> gen_match_stackframes (mono_eq _) tf S1 S2 -> gen_match_stackframes (mono_eq _) tf' S1 S2.
 Proof.
-  intros. inv H0. econstructor; eauto. eapply is_transitive; eauto. apply H; eauto.
+  intros ? ? ? ? Hpred H. inv H. econstructor; eauto. eapply is_transitive; eauto. apply Hpred; eauto.
 Qed.
 
 Lemma gen_match_stackframes_ref_eq:
@@ -630,17 +630,17 @@ Qed.
 Lemma gen_match_stackframes_monotone_complete :
   forall {tf tf' S1 S2}, tf ⊑ tf' -> gen_match_stackframes (anti_eq _) tf' S1 S2 -> gen_match_stackframes (anti_eq _) tf S1 S2.
 Proof.
-  intros. inv H0. econstructor; eauto. unfold anti_eq in *. destruct_ctx.
-  unfold_refinement in H.
-  specialize (H (romem_for cu) f). 
-  eapply is_complete_minimal in H; eauto. rewrite H; eauto.
+  intros ? ? ? ? Hprec H. inv H. econstructor; eauto. unfold anti_eq in *. destruct_ctx.
+  unfold_refinement in Hprec.
+  specialize (Hprec (romem_for cu) f). 
+  eapply is_complete_minimal in Hprec; eauto. rewrite Hprec; eauto.
 Qed.
 
 Lemma gen_match_stackframes_complete_monotone :
   forall {tf S1 S2}, gen_match_stackframes (anti_eq _) tf S1 S2 -> gen_match_stackframes (mono_eq _) tf S1 S2.
 Proof.
-  intros.  inv H. econstructor; eauto. unfold mono_eq, anti_eq in *. destruct_ctx.
-  rewrite <- FUN1. reflexivity.
+  intros ? ? ? H.  inv H. econstructor; eauto. unfold mono_eq, anti_eq in *. destruct FUN as [? FUN].
+  rewrite <- FUN. reflexivity.
 Qed.
 
 
