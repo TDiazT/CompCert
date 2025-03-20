@@ -512,7 +512,7 @@ Definition match_stackframes := @match_stackframes_pred eq.
 
 
 #[local, refine] 
-Instance monoMatchStackframes S1 S2 : IncRef (fun transf_f => match_stackframes transf_f S1 S2) :=
+Instance IncRefMatchStackframes S1 S2 : IncRef (fun transf_f => match_stackframes transf_f S1 S2) :=
 { 
   ir_mono := fun tf => match_stackframes_pred (fun x y => y ⊑ x) tf S1 S2 ;
   ir_anti := fun tf => match_stackframes_pred (fun tf1 tf2 => is_complete tf1 /\ tf1 = tf2) tf S1 S2;
