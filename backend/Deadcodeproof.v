@@ -494,7 +494,7 @@ Qed.
 
 
 
-Inductive gen_match_stackframes {B} (R : res (@function_ B) -> res (@function_ B) -> Prop) (transf_f : romem -> function -> res (@function_ B)): stackframe -> stackframe -> Prop :=
+Inductive gen_match_stackframes (R : res RTL_Incomplete.function -> res RTL_Incomplete.function -> Prop) (transf_f : romem -> function -> res RTL_Incomplete.function): stackframe -> stackframe -> Prop :=
   | gen_match_stackframes_intro:
       forall res f sp pc e tf te cu an
         (LINK: linkorder cu prog)
@@ -507,7 +507,7 @@ Inductive gen_match_stackframes {B} (R : res (@function_ B) -> res (@function_ B
       gen_match_stackframes R transf_f (Stackframe res f (Vptr sp Ptrofs.zero) pc e)
                         (Stackframe res tf (Vptr sp Ptrofs.zero) pc te).
 
-Definition match_stackframes {B} := @gen_match_stackframes B eq.
+Definition match_stackframes := @gen_match_stackframes eq.
 
 
 
@@ -912,10 +912,10 @@ Qed.
 (* UNTIL HERE : They remain the same *)
 
 
-Definition step_simulation_pred (transf_f : romem -> function -> res RTL_Incomplete.function) :=
+Definition step_simulation_pred (transf_function : romem -> function -> res RTL_Incomplete.function) :=
   forall S1 t S2, step ge S1 t S2 ->
-  forall S1', match_states transf_f S1 S1' -> sound_state prog S1 ->
-  exists S2', RTL_Incomplete.step tge S1' t S2' /\ match_states transf_f S2 S2'.
+  forall S1', match_states transf_function S1 S1' -> sound_state prog S1 ->
+  exists S2', RTL_Incomplete.step tge S1' t S2' /\ match_states transf_function S2 S2'.
 
 Lemma inc_step_simulation : ir_mono step_simulation_pred transf_function.
 Proof. 
