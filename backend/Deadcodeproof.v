@@ -11,7 +11,7 @@
 (* *********************************************************************)
 
 (** Elimination of unneeded computations over RTL: correctness proof. *)
-Require Import RefinementInstances.
+Require Import IncReaseInstances.
 
 Require Import FunInd.
 Require Import Coqlib Maps Errors Integers Floats Lattice Kildall.

@@ -143,7 +143,7 @@ BACKEND=\
   ConstpropOp.v Constprop.v ConstpropOpproof.v Constpropproof.v \
   CSEdomain.v CombineOp.v CSE.v CombineOpproof.v CSEproof.v \
   NeedDomain.v NeedOp.v \
-  Refinement.v RefinementInstances.v \
+  IncRease.v IncReaseInstances.v \
   Deadcode.v Deadcodeproof.v \
   Unusedglob.v Unusedglobproof.v \
   Machregs.v Locations.v Conventions1.v Conventions.v LTL.v \
