@@ -6,40 +6,46 @@ Require Import Coqlib Maps Errors
                RTL RTL_Incomplete
                ValueDomain.
 
+(** Some instances are not specified because we rely on the default instances.
+    For container types we need to define the instances to check their contents.
+    This could be automatized probably *)
 Create HintDb icp_ccert.
 
 (* Destructs conjunctions, disjunctions, etc. *)
-Ltac destruct_ctx := 
+Ltac destruct_ctx :=
   repeat (match goal with
-  | [H : _ \/ _ |- _ ] => 
-    let Hl := fresh H in 
-    let Hr := fresh H in
-    destruct H as [Hl | Hr]
-  | [H : _ /\ _ |- _ ] => 
-    let Hl := fresh H in 
-    let Hr := fresh H in
-    destruct H as [Hl Hr]
-  | [H : _ <-> _ |- _ ] => 
-    let Hl := fresh H in 
-    let Hr := fresh H in
-    destruct H as [Hl Hr]
-  | [H : exists (x : _), _ |- _ ] =>
-    let x := fresh x in
-    destruct H as [x H]
-  | [H : ?P , H2 : ?P |- _ ] => clear H2
-  end
-  ).
+          | [H : _ \/ _ |- _ ] =>
+              let Hl := fresh H in
+              let Hr := fresh H in
+              destruct H as [Hl | Hr]
+          | [H : _ /\ _ |- _ ] =>
+              let Hl := fresh H in
+              let Hr := fresh H in
+              destruct H as [Hl Hr]
+          | [H : _ <-> _ |- _ ] =>
+              let Hl := fresh H in
+              let Hr := fresh H in
+              destruct H as [Hl Hr]
+          | [H : exists (x : _), _ |- _ ] =>
+              let x := fresh x in
+              destruct H as [x H]
+          | [H : ?P , H2 : ?P |- _ ] => clear H2
+          end
+    ).
 
 
-#[export, refine] Instance refinableRes {A} `{Refinable A} : Refinable (res A) := 
-{
-  refinement r1 r2 := match r1, r2 with 
-  | OK x1, OK x2 => x1 ⊑ x2
-  (* Just to get completeMinimal *)
-  | Error e1, Error e2 => e1 = e2
-  | _, _ => False
-  end
-}.
+(***********************************)
+(*          [res] instances        *)
+(***********************************)
+#[export, refine] Instance refinableRes {A} `{Refinable A} : Refinable (res A) :=
+  {
+    refinement r1 r2 := match r1, r2 with
+                        | OK x1, OK x2 => x1 ⊑ x2
+                        (* Just to get completeMinimal *)
+                        | Error e1, Error e2 => e1 = e2
+                        | _, _ => False
+                        end
+  }.
 Proof.
   - unfold Relation_Definitions.transitive; intros [] [] [] ? ?; eauto; try contradiction.
     * eapply is_transitive; eauto.
@@ -48,54 +54,60 @@ Proof.
 Defined.
 
 #[export]
-Instance completeRes {A} `{Complete A} : Complete (res A) := 
+  Instance completeRes {A} `{Complete A} : Complete (res A) :=
   {
     is_complete := fun r => match r with
-    | OK x => is_complete x
-    | Error _ => True
-    end
+                         | OK x => is_complete x
+                         | Error _ => True
+                         end
   }.
 
-#[export] 
-Instance completeMinimalRes {A} `{CompleteMinimal A} : CompleteMinimal (res A).
-Proof. 
+#[export]
+  Instance completeMinimalRes {A} `{CompleteMinimal A} : CompleteMinimal (res A).
+Proof.
   constructor; intros [] ? []; simpl; try contradiction; intros.
   - f_equal. eapply is_complete_minimal; eauto.
   - rewrite H3; reflexivity.
-Defined. 
+Defined.
 
-#[export, refine] 
-Instance refinableOption {A} `{Refinable A} : Refinable (option A) := 
-{
-  refinement o1 o2 := match o1, o2 with 
-  | Some x1, Some x2 => x1 ⊑ x2
-  | None, None => True
-  | _, _ => False
-  end
-}.
+(***********************************)
+(*       [option] instances        *)
+(***********************************)
+#[export, refine]
+  Instance refinableOption {A} `{Refinable A} : Refinable (option A) :=
+  {
+    refinement o1 o2 := match o1, o2 with
+                        | Some x1, Some x2 => x1 ⊑ x2
+                        | None, None => True
+                        | _, _ => False
+                        end
+  }.
 Proof.
   - unfold Relation_Definitions.transitive; intros [] [] [] ? ?; eauto; try contradiction.
     eapply is_transitive; eauto.
   - unfold reflexive; intros []; eauto; reflexivity.
 Defined.
 
-#[export] 
-Instance completeOption {A} `{Complete A} : Complete (option A) := 
+#[export]
+  Instance completeOption {A} `{Complete A} : Complete (option A) :=
   {
     is_complete := fun o => match o with
-    | Some x => is_complete x
-    | None => True
-    end
+                         | Some x => is_complete x
+                         | None => True
+                         end
   }.
 
-#[export] 
-Instance completeMinimalOption {A} `{CompleteMinimal A} : CompleteMinimal (option A).
+#[export]
+  Instance completeMinimalOption {A} `{CompleteMinimal A} : CompleteMinimal (option A).
 Proof. constructor; intros [] ? []; simpl; try contradiction; intros; eauto.
-      f_equal. eapply is_complete_minimal; eauto.
-Defined. 
+       f_equal. eapply is_complete_minimal; eauto.
+Defined.
 
-#[export, refine] 
-Instance refinableList {A} `{Refinable A} : Refinable (list A) := 
+(***********************************)
+(*         [list] instances        *)
+(***********************************)
+#[export, refine]
+Instance refinableList {A} `{Refinable A} : Refinable (list A) :=
 {
   refinement l1 l2 := let fix aux l1 l2 :=
    match l1, l2 with
@@ -108,31 +120,34 @@ Proof.
   - unfold Relation_Definitions.transitive. induction x; intros; destruct y; eauto; try contradiction.
     destruct z; eauto; try contradiction. destruct H0; destruct H1; split; try eapply is_transitive; eauto.
     eapply IHx; eauto.
-  - unfold reflexive; intros l1; induction l1; eauto; try contradiction; simpl. 
-    split; eauto; reflexivity. 
+  - unfold reflexive; intros l1; induction l1; eauto; try contradiction; simpl.
+    split; eauto; reflexivity.
 Defined.
 
-#[export] 
-Instance completeList {A} `{Complete A} : Complete (list A) := 
+#[export]
+Instance completeList {A} `{Complete A} : Complete (list A) :=
   {
-    is_complete l := let fix aux l := 
-    match l with 
-    | nil => True 
+    is_complete l := let fix aux l :=
+    match l with
+    | nil => True
     | x :: xs => is_complete x /\ aux xs
     end in aux l
   }.
 
-#[export] 
+#[export]
 Instance completeMinimalList {A} `{CompleteMinimal A} : CompleteMinimal (list A).
 Proof. constructor; intros l; induction l; intros [] []; try contradiction; eauto.
   intros []. f_equal. eapply is_complete_minimal; eauto.
   apply IHl; eauto.
 Defined.
-  
-#[export, refine] 
-Instance refinableSum {A B} `{Refinable A} `{Refinable B} : Refinable (A + B) := 
+
+(***********************************)
+(*         [list] instances        *)
+(***********************************)
+#[export, refine]
+Instance refinableSum {A B} `{Refinable A} `{Refinable B} : Refinable (A + B) :=
 {
-  refinement s1 s2 := match s1, s2 with 
+  refinement s1 s2 := match s1, s2 with
   | inl x1, inl x2 => x1 ⊑ x2
   | inr y1, inr y2 => y1 ⊑ y2
   | _, _ => False
@@ -143,8 +158,8 @@ Proof.
   - unfold reflexive; intros []; eauto; reflexivity.
 Defined.
 
-#[export] 
-Instance completeSum {A B} `{Complete A} `{Complete B} : Complete (A + B) := 
+#[export]
+Instance completeSum {A B} `{Complete A} `{Complete B} : Complete (A + B) :=
   {
     is_complete := fun s => match s with
     | inl x => is_complete x
@@ -152,36 +167,42 @@ Instance completeSum {A B} `{Complete A} `{Complete B} : Complete (A + B) :=
     end
   }.
 
-#[export] 
+#[export]
 Instance completeMinimalSum {A B} `{CompleteMinimal A} `{CompleteMinimal B} : CompleteMinimal (A + B).
 Proof. constructor; intros [] ?; intros []; try contradiction; intros; eauto; f_equal; eapply is_complete_minimal; eauto.
 Defined.
 
-#[export, refine] 
-Instance refinableProd {A B} `{Refinable A} `{Refinable B} : Refinable (A * B) := 
-{
-  refinement p1 p2 := let (x1, y1) := p1 in let (x2, y2) := p2 in x1 ⊑ x2 /\ y1 ⊑ y2
-}.
+(***********************************)
+(*         [prod] instances        *)
+(***********************************)
+#[export, refine]
+  Instance refinableProd {A B} `{Refinable A} `{Refinable B} : Refinable (A * B) :=
+  {
+    refinement p1 p2 := let (x1, y1) := p1 in let (x2, y2) := p2 in x1 ⊑ x2 /\ y1 ⊑ y2
+  }.
 Proof.
   - unfold Relation_Definitions.transitive; intros [] [] [] [] []; split; try eapply is_transitive; eauto.
   - unfold reflexive; intros []; split; eauto; reflexivity.
 Defined.
 
-#[export] 
-Instance completeProd {A B} `{Complete A} `{Complete B} : Complete (A * B) := 
+#[export]
+  Instance completeProd {A B} `{Complete A} `{Complete B} : Complete (A * B) :=
   {
     is_complete := fun p => let (x, y) := p in is_complete x /\ is_complete y
   }.
 
-#[export] 
-Instance completeMinimalProd {A B} `{CompleteMinimal A} `{CompleteMinimal B} : CompleteMinimal (A * B).
-Proof. constructor; intros [] [] [] []; f_equal; eapply is_complete_minimal; eauto. 
-Defined. 
+#[export]
+  Instance completeMinimalProd {A B} `{CompleteMinimal A} `{CompleteMinimal B} : CompleteMinimal (A * B).
+Proof. constructor; intros [] [] [] []; f_equal; eapply is_complete_minimal; eauto.
+Defined.
 
 
-#[export, refine] 
-Instance monoForall2 {C} `{Refinable C} `{Complete C} {A} (l1 : list A) {B} (l2 : list B) (f : C -> A -> B -> Prop) 
-  {Hf : forall a b, IncRef (fun c => f c a b)} : IncRef (fun c => list_forall2 (f c) l1 l2) := 
+(***********************************)
+(*         IncRef [list_forall2]   *)
+(***********************************)
+#[export, refine]
+Instance monoForall2 {C} `{Refinable C} `{Complete C} {A} (l1 : list A) {B} (l2 : list B) (f : C -> A -> B -> Prop)
+  {Hf : forall a b, IncRef (fun c => f c a b)} : IncRef (fun c => list_forall2 (f c) l1 l2) :=
 {
   ir_mono := fun c => list_forall2 (fun a b => ir_mono (fun c => f c a b) c) l1 l2;
   ir_anti := fun c => list_forall2 (fun a b => ir_anti (fun c => f c a b) c) l1 l2;
@@ -191,16 +212,19 @@ Proof.
   - intros ? ? ?; induction 1; constructor; eauto. eapply is_antitone_anti; eauto.
   - intros ?; induction 1; constructor; eauto. eapply approx_mono; eauto.
   - intros ?. induction 1; constructor; eauto. set (c := a) in *.
-    eapply (Hf a1 b1). apply H1. 
+    eapply (Hf a1 b1). apply H1.
   - intros c ?; induction 1; econstructor; eauto.
     pattern c. eapply (recoverability_mono c H1); eauto.
   - intros c ?; induction 1; econstructor; eauto.
-    eapply (recoverability_anti c H1); eauto. 
+    eapply (recoverability_anti c H1); eauto.
 Defined.
-  
+
 
 #[local] Obligation Tactic := idtac.
 
+(***********************************)
+(*     [instruction] instances     *)
+(***********************************)
 Definition refinement_instruction : relation instruction  := fun i1 i2 =>
 match i1, i2 with
 | Inop n1, Inop n2 => n1 ⊑ n2
@@ -217,21 +241,21 @@ match i1, i2 with
 | _ , _ => False
 end.
 
-#[export] 
+#[export]
 Program Instance refinableInstruction : Refinable instruction :=
   {|
     refinement i1 i2 := refinement_instruction i1 i2
   |}.
-  Next Obligation. 
+  Next Obligation.
     red; intros [] [] []; intros H H0; cbn in *; eauto.
     all: try solve [inversion H]; try solve [inversion H0].
     all: destruct_ctx; repeat split; etransitivity; eauto.
-  Qed. 
+  Qed.
   Next Obligation.
     unfold reflexive. intros []; cbn; eauto;
       try repeat split; reflexivity; eauto.
-  Qed. 
-  
+  Qed.
+
 Inductive is_complete_instruction : instruction -> Prop :=
 | is_complete_Inop : forall n, is_complete n -> is_complete_instruction (Inop n)
 | is_complete_Iop : forall op args res n, is_complete op -> is_complete args -> is_complete res -> is_complete n -> is_complete_instruction (Iop op args res n)
@@ -244,71 +268,80 @@ Inductive is_complete_instruction : instruction -> Prop :=
 | is_complete_Ijumptable : forall r n, is_complete r -> is_complete n -> is_complete_instruction (Ijumptable r n)
 | is_complete_Ireturn : forall mr, is_complete mr -> is_complete_instruction (Ireturn mr).
 
-#[export] 
-Instance completeInstruction : Complete instruction := 
-{ 
+#[export]
+Instance completeInstruction : Complete instruction :=
+{
   is_complete := is_complete_instruction
 }.
 
 
-#[export, refine] 
-Instance completeMinimalInstruction : CompleteMinimal instruction := {}. 
+#[export, refine]
+Instance completeMinimalInstruction : CompleteMinimal instruction := {}.
 Proof.
   intros []; inversion 1; intros [] Href; red in Href; cbn in *.
   all: try solve [inversion Href].
   all: destruct_ctx; f_equal; eauto.
   all: eapply is_complete_minimal; eauto.
- Qed.  
+ Qed.
 
-#[export] 
-Program Instance refinablePTree {A} `{Refinable A} : Refinable (PTree.t A) := 
-{
-  refinement t1 t2 := forall pc, t1 ! pc ⊑ t2 ! pc  
-}.
+(***********************************)
+(*       [PTree] instances         *)
+(***********************************)
+#[export]
+  Program Instance refinablePTree {A} `{Refinable A} : Refinable (PTree.t A) :=
+  {
+    refinement t1 t2 := forall pc, t1 ! pc ⊑ t2 ! pc
+  }.
 Next Obligation.
   red; intros. etransitivity; eauto.
-Qed.    
+Qed.
 Next Obligation.
   unfold reflexive; cbn; intros. reflexivity; eauto.
-Qed.    
+Qed.
 
-#[export] 
-Instance completePTree {A} `{Complete A} : Complete (PTree.t A) := 
-{
-  is_complete t := forall pc, is_complete (t ! pc)
-}.
+#[export]
+  Instance completePTree {A} `{Complete A} : Complete (PTree.t A) :=
+  {
+    is_complete t := forall pc, is_complete (t ! pc)
+  }.
 
-#[export] 
-Program Instance completeMinimalPTree {A} `{CompleteMinimal A} : CompleteMinimal (PTree.t A).
+#[export]
+  Program Instance completeMinimalPTree {A} `{CompleteMinimal A} : CompleteMinimal (PTree.t A).
 Next Obligation.
   intros ? ? ? ? a Hc a' Hprec. eapply PTree.extensionality. intro p; specialize (Hc p).
   eapply is_complete_minimal; eauto.
 Qed.
 
-#[export] 
-Instance : Refinable romem. apply refinablePTree. Defined.
-#[export] 
-Instance : Complete romem. apply completePTree. Defined.
+(***********************************)
+(*       [romem] instances         *)
+(***********************************)
+#[export]
+  Instance : Refinable romem. apply refinablePTree. Defined.
+#[export]
+  Instance : Complete romem. apply completePTree. Defined.
 
-Lemma romem_complete : forall r : romem, is_complete r. 
+Lemma romem_complete : forall r : romem, is_complete r.
 Proof. intros; unfold_complete; intros; unfold_complete; destruct (_ ! _); try unfold_complete; eauto. Qed.
 
 #[export]
-Hint Resolve romem_complete : icp_ccert.
+  Hint Resolve romem_complete : icp_ccert.
 
-Lemma romem_sp : forall r : romem, r ⊑ r. 
+Lemma romem_sp : forall r : romem, r ⊑ r.
 Proof. intros; unfold_refinement; intros; unfold_refinement; destruct (_ ! _); try unfold_refinement; eauto. Qed.
 
 #[export]
-Hint Resolve romem_sp : icp_ccert.
+  Hint Resolve romem_sp : icp_ccert.
 
-#[export, refine] 
-Instance : Refinable function := 
+(***********************************)
+(*       [function] instances      *)
+(***********************************)
+#[export, refine]
+  Instance : Refinable function :=
   {
-    refinement f1 f2 := 
-    (fn_sig f1) ⊑ (fn_sig f2) /\ (fn_params f1) ⊑ (fn_params f2) /\ (fn_stacksize f1) ⊑ (fn_stacksize f2) /\ (fn_code f1) ⊑ (fn_code f2) /\ (fn_entrypoint f1) ⊑ (fn_entrypoint f2)
+    refinement f1 f2 :=
+      (fn_sig f1) ⊑ (fn_sig f2) /\ (fn_params f1) ⊑ (fn_params f2) /\ (fn_stacksize f1) ⊑ (fn_stacksize f2) /\ (fn_code f1) ⊑ (fn_code f2) /\ (fn_entrypoint f1) ⊑ (fn_entrypoint f2)
   }.
-Proof. 
+Proof.
   - unfold Relation_Definitions.transitive; intros [] [] [] ? ?.
     destruct_ctx.
     repeat split; try eapply is_transitive; eauto.
@@ -316,17 +349,20 @@ Proof.
 Defined.
 
 
-#[export] 
-Instance : Complete function := {
-  is_complete f := 
-  is_complete (fn_sig f) /\ is_complete (fn_params f) /\ is_complete (fn_stacksize f) /\ is_complete (fn_code f) /\ is_complete (fn_entrypoint f)
-}.
+#[export]
+  Instance : Complete function := {
+    is_complete f :=
+      is_complete (fn_sig f) /\ is_complete (fn_params f) /\ is_complete (fn_stacksize f) /\ is_complete (fn_code f) /\ is_complete (fn_entrypoint f)
+  }.
 
-#[export] 
-Instance : CompleteMinimal function.
+#[export]
+  Instance : CompleteMinimal function.
 Proof. constructor. intros [] HC [] HR. unfold_complete in HC; unfold_refinement in HR. destruct_ctx. unshelve f_equal; unshelve eapply is_complete_minimal; eauto; try typeclasses eauto.
 Defined.
 
+(***********************************)
+(*     [AST.fundef] instances      *)
+(***********************************)
 Definition refinementFunDef {F} `{Refinable F} : relation (AST.fundef F) := fun fd1 fd2 =>
   match fd1, fd2 with
   | External ef1, External ef2 => ef1 ⊑ ef2
@@ -335,96 +371,106 @@ Definition refinementFunDef {F} `{Refinable F} : relation (AST.fundef F) := fun 
   end.
 
 #[export]
-Program Instance refinableASTFundef {F} `{Refinable F} : Refinable (AST.fundef F) := 
+Program Instance refinableASTFundef {F} `{Refinable F} : Refinable (AST.fundef F) :=
 {
-  refinement := refinementFunDef 
+  refinement := refinementFunDef
 }.
 Next Obligation.
-  red; cbn; intros ? ? [] [] []; cbn; eauto. 
+  red; cbn; intros ? ? [] [] []; cbn; eauto.
   all: try inversion 1; try inversion 2.
   all: try etransitivity; eauto.
   reflexivity.
-Qed. 
+Qed.
 Next Obligation.
-  red. intros ? ? []; cbn; eauto; reflexivity. 
-Qed. 
+  red. intros ? ? []; cbn; eauto; reflexivity.
+Qed.
 
 #[export]
-Instance completeASTFundef {F} `{Complete F} : Complete (AST.fundef F) := 
+Instance completeASTFundef {F} `{Complete F} : Complete (AST.fundef F) :=
 {
-  is_complete fd := 
+  is_complete fd :=
     match fd with
     | External ef => is_complete ef
     | Internal f => is_complete f
     end
 }.
 
-#[export] 
+#[export]
 Instance completeMinimalASTFundef {F} `{CompleteMinimal F} : CompleteMinimal (AST.fundef F).
 Proof. constructor. intros [] ? [] ?; try contradiction;
   try f_equal; eauto; eapply is_complete_minimal; eauto.
 Qed.
 
-#[export] 
+#[export]
 Instance : Refinable fundef. apply refinableASTFundef. Defined.
-#[export] 
+#[export]
 Instance : Complete fundef. apply completeASTFundef. Defined.
-#[export] 
-Instance : CompleteMinimal fundef. apply completeMinimalASTFundef.  Defined. 
+#[export]
+Instance : CompleteMinimal fundef. apply completeMinimalASTFundef.  Defined.
 
 
-#[export] 
-Program Instance refinableASTProgram : Refinable program := 
-{
-  refinement p1 p2 := forall ros rs, find_function (Genv.globalenv p1) ros rs ⊑ find_function (Genv.globalenv p2) ros rs
-}.
+(***********************************)
+(*       [program] instances       *)
+(***********************************)
+#[export]
+  Program Instance refinableASTProgram : Refinable program :=
+  {
+    refinement p1 p2 := forall ros rs, find_function (Genv.globalenv p1) ros rs ⊑ find_function (Genv.globalenv p2) ros rs
+  }.
 Next Obligation.
   red; cbn; intros. etransitivity; eauto.
-Qed. 
+Qed.
 Next Obligation.
   unfold reflexive; intros; reflexivity.
-Qed. 
-
-#[export] 
-Instance completeASTProgram : Complete program := 
-{
-  is_complete p := (forall ros rs, is_complete (find_function (Genv.globalenv p) ros rs)) /\ forall b, is_complete (Genv.find_funct_ptr (Genv.globalenv p) b)
-}.
+Qed.
 
 #[export]
-Instance : Refinable program. apply refinableASTProgram. Defined.
+  Instance completeASTProgram : Complete program :=
+  {
+    is_complete p := (forall ros rs, is_complete (find_function (Genv.globalenv p) ros rs)) /\ forall b, is_complete (Genv.find_funct_ptr (Genv.globalenv p) b)
+  }.
+
 #[export]
-Instance : Complete program. apply completeASTProgram. Defined.
- 
-#[export, refine] 
-Instance : Refinable stackframe := 
-{
-  refinement '(Stackframe r1 f1 v1 n1 rs1) '(Stackframe r2 f2 v2 n2 rs2) := 
-  r1 ⊑ r2 /\ f1 ⊑ f2 /\ v1 ⊑ v2 /\ n1 ⊑ n2 /\ rs1 ⊑ rs2
-}.
+  Instance : Refinable program. apply refinableASTProgram. Defined.
+#[export]
+  Instance : Complete program. apply completeASTProgram. Defined.
+
+(***********************************)
+(*      [stackframe] instances     *)
+(***********************************)
+#[export, refine]
+  Instance : Refinable stackframe :=
+  {
+    refinement '(Stackframe r1 f1 v1 n1 rs1) '(Stackframe r2 f2 v2 n2 rs2) :=
+      r1 ⊑ r2 /\ f1 ⊑ f2 /\ v1 ⊑ v2 /\ n1 ⊑ n2 /\ rs1 ⊑ rs2
+  }.
 Proof.
   - unfold Relation_Definitions.transitive; intros [] [] [] ? ?; destruct_ctx.
-    unfold_refinement in H7; unfold_refinement in H0; destruct_ctx. 
+    unfold_refinement in H7; unfold_refinement in H0; destruct_ctx.
     repeat split; eapply is_transitive; eauto.
   - unfold reflexive; intros []; repeat split; reflexivity.
 Defined.
 
+
+(***********************************)
+(*        [state] instances        *)
+(***********************************)
 Inductive refinement_state : state -> state -> Prop :=
-| refinement_State : forall sfr1 sfr2 f1 f2 v1 v2 n1 n2 r1 r2 m1 m2, 
+| refinement_State : forall sfr1 sfr2 f1 f2 v1 v2 n1 n2 r1 r2 m1 m2,
   sfr1 ⊑ sfr2 -> f1 ⊑ f2 -> v1 ⊑ v2 -> n1 ⊑ n2 -> r1 ⊑ r2 -> m1 ⊑ m2 -> refinement_state (State sfr1 f1 v1 n1 r1 m1) (State sfr2 f2 v2 n2 r2 m2)
 | refinement_Callstate : forall sfr1 sfr2 fd1 fd2 v1 v2 m1 m2,
   sfr1 ⊑ sfr2 -> fd1 ⊑ fd2 -> v1 ⊑ v2 -> m1 ⊑ m2 -> refinement_state (Callstate sfr1 fd1 v1 m1) (Callstate sfr2 fd2 v2 m2)
-| refinement_Returnstate : forall sfr1 sfr2 v1 v2 m1 m2, 
+| refinement_Returnstate : forall sfr1 sfr2 v1 v2 m1 m2,
   sfr1 ⊑ sfr2 -> v1 ⊑ v2 -> m1 ⊑ m2 -> refinement_state (Returnstate sfr1 v1 m1) (Returnstate sfr2 v2 m2).
 
-#[export] 
-Program Instance : Refinable state := 
+#[export]
+Program Instance : Refinable state :=
 {
   refinement := refinement_state
 }.
 Next Obligation.
   intros ? ? ? []; inversion 1; constructor; etransitivity; eauto.
-Qed. 
+Qed.
 Next Obligation.
   unfold reflexive; intros []; constructor; reflexivity.
 Qed.

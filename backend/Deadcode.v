@@ -143,7 +143,7 @@ Definition transfer (f: function) (approx: PMap.t VA.t)
   | Some(Ibuiltin ef args res s) =>
       transfer_builtin approx!!pc ef args res ne nm
   | Some(Icond cond args s1 s2) =>
-      if peq s1 s2 then after else 
+      if peq s1 s2 then after else
         (add_needs args (needs_of_condition cond) ne, nm)
   | Some(Ijumptable arg tbl) =>
       (add_need_all arg ne, nm)
@@ -159,10 +159,13 @@ Definition analyze (approx: PMap.t VA.t) (f: function): option (PMap.t NA.t) :=
 
 (** * Part 2: the code transformation *)
 
+(***********************************)
+(*       Incomplete function       *)
+(***********************************)
 Definition transf_instr (approx: PMap.t VA.t) (an: PMap.t NA.t)
                         (pc: node) (instr: instruction) : RTL_Incomplete.instruction :=
   match instr with
-  | Iop op args res s => Inotimplemented
+  | Iop op args res s => Inotimplemented (* Made incomplete *)
       (* let nres := nreg (fst an!!pc) res in
       if is_dead nres then
         RTL_Incomplete.Inop s
@@ -212,14 +215,9 @@ Definition transf_function (rm: romem) (f: function) : res RTL_Incomplete.functi
   end.
 
 
-(* Definition transf_fundef_aux {A B} (transf_f : A -> res B) (fd: fundef) : res (AST.fundef A) :=
-  AST.transf_partial_fundef transf_f fd. *)
-
-
 Definition transf_fundef (rm: romem) (fd: fundef) : res RTL_Incomplete.fundef :=
   AST.transf_partial_fundef (transf_function rm) fd.
 
-  
 Definition transf_program_aux (p: program) transf_f: res RTL_Incomplete.program :=
   transform_partial_program (AST.transf_partial_fundef (transf_f (romem_for p))) p.
 

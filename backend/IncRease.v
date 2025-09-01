@@ -24,21 +24,21 @@ Tactic Notation "unfold_refinement" "in" hyp(H) := unfold refinement in H; cbn i
 #[export] Hint Extern 0 (refinement _ _) => eassumption : typeclass_instances.
 #[export] Hint Extern 0 (?t ⊑ ?t) => reflexivity : typeclass_instances.
 
-#[export] 
+#[export]
 Instance refinableTransitive {A} `{Refinable A} : Transitive refinement := { transitivity := is_transitive }.
-#[export] 
+#[export]
 Instance refinableReflexive {A} `{Refinable A} : Reflexive refinement := { reflexivity := is_reflexive }.
 
-#[export] 
+#[export]
 Program Instance refinableFun {A B} `{Refinable B} : Refinable (A -> B) :=
   {
     refinement f g := forall a, f a ⊑ g a ;
   }.
-Next Obligation. 
-  red; intros; etransitivity; eauto. 
+Next Obligation.
+  red; intros; etransitivity; eauto.
 Qed.
 Next Obligation.
-  red; intros; reflexivity. 
+  red; intros; reflexivity.
 Qed.
 
 #[export] Hint Extern 0 ((?f ?x) ⊑ (?g ?y)) => match goal with [H : ?f ⊑ ?g |- (?f ?x) ⊑ (?g ?y)] => apply H end : typeclass_instances.
@@ -46,7 +46,7 @@ Qed.
 (***********************************)
 (*          Monotonous             *)
 (***********************************)
-Definition is_monotone {A B} `{Refinable A} `{Refinable B} (f : A -> B) := 
+Definition is_monotone {A B} `{Refinable A} `{Refinable B} (f : A -> B) :=
     forall a1 a2, a1 ⊑ a2 -> f a1 ⊑ f a2.
 
 #[export] Hint Extern 1 (is_monotone _) => unfold is_monotone : typeclass_instances.
@@ -60,7 +60,7 @@ Qed.
 Existing Class is_monotone.
 
 #[export] Hint Resolve fun_is_monotone : typeclass_instances.
-    
+
 (***********************************)
 (*          Complete               *)
 (***********************************)
@@ -79,7 +79,7 @@ Tactic Notation "unfold_complete" := unfold is_complete; cbn.
 #[export] Hint Extern 0 (is_complete _) => eassumption : typeclass_instances.
 #[export] Hint Extern 1 (is_complete _) => unfold_complete : typeclass_instances.
 
-#[export] 
+#[export]
 Instance completeFun {A B} `{Complete A} `{Complete B} : Complete (A -> B) :=
   {
     is_complete f := forall a, is_complete a -> is_complete (f a) ;
@@ -95,9 +95,9 @@ Qed.
 
 #[export] Hint Resolve apply_complete : typeclass_instances.
 
-Lemma is_complete_const_fun : forall {A B} `{Complete A} `{Complete B} (b : B), 
+Lemma is_complete_const_fun : forall {A B} `{Complete A} `{Complete B} (b : B),
   is_complete b -> is_complete (fun _ : A => b).
-Proof. 
+Proof.
   intros ? ? ? ? ? ? b Hb. red; cbn. intros; eauto.
 Qed.
 
@@ -124,8 +124,8 @@ Instance eqRefinable (A : Type) : Refinable A | 100 :=
   is_reflexive := ltac:(red; intros; reflexivity) ;
  |}.
 
-  
-(* Makes complete instances where the complete predicate is always true. 
+
+(* Makes complete instances where the complete predicate is always true.
   The premise is just to reuse the definition for other types with eq refinement.
 *)
 #[export]
@@ -144,8 +144,10 @@ exact I
 Instance eqCompleteMinimalTrue (A : Type) (refEqA := eqRefinable A) (compA := eqCompleteTrue A) : CompleteMinimal A | 100.
 Proof. econstructor. eauto. Qed.
 
-  
 
+(***********************************)
+(*     IncRef Class/Instances      *)
+(***********************************)
 Section IncReformulation.
   Context {A} {HA: Refinable A} {HAC : Complete A}.
 
@@ -161,8 +163,8 @@ Section IncReformulation.
       recoverability_anti : forall (a : A), is_complete a -> P a -> ir_anti a
       }.
 
-  Arguments ir_mono P {IncRef} a. 
-  Arguments ir_anti P {IncRef} a. 
+  Arguments ir_mono P {IncRef} a.
+  Arguments ir_anti P {IncRef} a.
 
   Lemma complete_monotone_is_equivalent {P} `{IncRef P} : forall (a : A), is_complete a -> ir_mono P a <-> P a.
   Proof.
@@ -176,27 +178,29 @@ Section IncReformulation.
 
   Obligation Tactic :=  try now eauto.
 
-  #[export] 
+  (** μ/ν-Const *)
+  #[export]
   Program Instance IncRefConst (P : Prop) : IncRef (fun a => P) := {
       ir_mono := fun _ => P ;
       ir_anti := fun _ => P ;
     }.
-  
+
   Obligation Tactic :=  try now intuition.
 
-  #[export] 
+  (** μ/ν-= *)
+  #[export]
   Program Instance IncRefEq {B} `{HB : CompleteMinimal B}
     (f g : A -> B) (Hcf : is_monotone f) (Hcg : is_monotone g)
     (Hcf' : is_complete f) (Hcg' : is_complete g)
     : IncRef (fun a => f a = g a) | 2
     := {
       ir_mono := fun a => exists b, b ⊑ f a /\ b ⊑ g a ;
-      ir_anti := fun a => is_complete (f a) /\ f a = g a ; 
+      ir_anti := fun a => is_complete (f a) /\ f a = g a ;
     }.
   Next Obligation.
     intros ? ? ? ? f g ? ? ? ? a1 a2 Hprec [b [? ?]].
     exists b. split.
-    - transitivity (f a1) ; auto. 
+    - transitivity (f a1) ; auto.
     - transitivity (g a1) ; auto.
   Qed.
   Next Obligation.
@@ -207,8 +211,8 @@ Section IncReformulation.
   Qed.
   Next Obligation.
   intros ? ? ? ? ? ? ? ? ? ? ? Hca.
-  cbn in *. eexists. split; try reflexivity. rewrite Hca; reflexivity.  
-  Qed. 
+  cbn in *. eexists. split; try reflexivity. rewrite Hca; reflexivity.
+  Qed.
   Next Obligation.
     intros ? ? ? ? ? ? ? ? ? ? ? ?.
     intros [b [Hb1 Hb2]].
@@ -217,9 +221,10 @@ Section IncReformulation.
     assumption.
   Qed.
 
-  #[export] 
+  (** μ/ν-=-L *)
+  #[export]
   Program Instance IncRefEqL {B} `{HB : CompleteMinimal B}
-    (f : A -> B) (Hcf : is_complete f) (Hmonof : is_monotone f) 
+    (f : A -> B) (Hcf : is_complete f) (Hmonof : is_monotone f)
     (b : B) : IncRef (fun a => f a = b) | 1 := {
       ir_mono := fun a => b ⊑ f a ;
       ir_anti := fun a => is_complete (f a) /\ f a = b ;
@@ -229,7 +234,7 @@ Section IncReformulation.
     transitivity (f a1); try apply Hcf; eauto.
   Qed.
   Next Obligation.
-    intros ? ? ? ? ? ? Hmono b a1 a2 Hprec [? ?]. 
+    intros ? ? ? ? ? ? Hmono b a1 a2 Hprec [? ?].
     eapply is_complete_minimal in Hmono; eauto.
     rewrite Hmono; eauto.
   Qed.
@@ -241,8 +246,9 @@ Section IncReformulation.
     cbn. symmetry. eapply is_complete_minimal; eauto.
   Qed.
 
-  #[export] 
-  Program Instance IncRefForall {B} {P : B -> A -> Prop} `{HPB : forall b, IncRef (P b)} :      
+  (** μ/ν-∀ *)
+  #[export]
+  Program Instance IncRefForall {B} {P : B -> A -> Prop} `{HPB : forall b, IncRef (P b)} :
     IncRef (fun a => forall b, P b a) :=
     {
       ir_mono := fun a => forall b, ir_mono (P b) a ;
@@ -273,9 +279,10 @@ Section IncReformulation.
     intros B P HPB a Hac; simpl; intros HP b; eapply complete_antitone_is_equivalent...
   Qed.
 
-  #[export] 
-  Program Instance IncRefExists {B} `{HB: Refinable B} 
-    {P : B -> A -> Prop} `{HPB : forall b, IncRef (P b)} 
+  (** μ/ν-∃ *)
+  #[export]
+  Program Instance IncRefExists {B} `{HB: Refinable B}
+    {P : B -> A -> Prop} `{HPB : forall b, IncRef (P b)}
     : IncRef (fun a => exists b, P b a) :=
     {
       ir_mono := fun a => exists b, ir_mono (P b) a ;
@@ -306,8 +313,9 @@ Section IncReformulation.
       eapply complete_antitone_is_equivalent...
   Qed.
 
-  #[export] 
-  Program Instance IncRefConj (P Q : A -> Prop) {HP : IncRef P} {HQ : IncRef Q} :  
+  (** μ/ν-∧ *)
+  #[export]
+  Program Instance IncRefConj (P Q : A -> Prop) {HP : IncRef P} {HQ : IncRef Q} :
     IncRef (fun a => P a /\ Q a) :=
     {
       ir_mono := fun a => (ir_mono P a) /\ (ir_mono Q a) ;
@@ -336,8 +344,9 @@ Section IncReformulation.
     intros P Q HP HQ a Hac; simpl; intros [HP1 HQ1]; split; try eapply complete_antitone_is_equivalent...
   Qed.
 
-  #[export] 
-  Program Instance IncRefDisj (P Q : A -> Prop) {HP : IncRef P} {HQ : IncRef Q} : 
+  (** μ/ν-∨ *)
+  #[export]
+  Program Instance IncRefDisj (P Q : A -> Prop) {HP : IncRef P} {HQ : IncRef Q} :
     IncRef (fun a => P a \/ Q a) :=
     {
       ir_mono := fun a => (ir_mono P a) \/ (ir_mono Q a) ;
@@ -374,8 +383,9 @@ Section IncReformulation.
       try (now right; apply complete_antitone_is_equivalent; eauto).
   Qed.
 
-  #[export] 
-  Program Instance IncRefArrow {P Q : A -> Prop} {HP : IncRef P} {HQ : IncRef Q} : 
+  (** μ/ν-→ *)
+  #[export]
+  Program Instance IncRefArrow {P Q : A -> Prop} {HP : IncRef P} {HQ : IncRef Q} :
     IncRef (fun a => P a -> Q a) :=
     {
       ir_mono := fun a => ir_anti P a -> ir_mono Q a ;
@@ -414,12 +424,12 @@ Section IncReformulation.
 
 End IncReformulation.
 
-Arguments ir_mono {A HA HAC} P {IncRef} _. 
-Arguments ir_anti {A HA HAC} P {IncRef} _. 
+Arguments ir_mono {A HA HAC} P {IncRef} _.
+Arguments ir_anti {A HA HAC} P {IncRef} _.
 
-Lemma IncRefEquiv : forall A `{Refinable A} `{Complete A} (P Q : A -> Prop) , 
-  IncRef P -> 
-  (forall a, P a <-> Q a) -> 
+Lemma IncRefEquiv : forall A `{Refinable A} `{Complete A} (P Q : A -> Prop) ,
+  IncRef P ->
+  (forall a, P a <-> Q a) ->
   IncRef Q.
 Proof.
   intros A HAR HAC P Q HPmono Hequiv.
@@ -428,33 +438,33 @@ Proof.
   - exact (ir_anti P).
   - eapply HPmono.(is_monotone_mono).
   - eapply HPmono.(is_antitone_anti).
-  - intros a Ha. now eapply approx_mono, Hequiv. 
-  - intros a Ha. now eapply Hequiv, approx_anti. 
+  - intros a Ha. now eapply approx_mono, Hequiv.
+  - intros a Ha. now eapply Hequiv, approx_anti.
   - intros a Hac.
     * intros HPa. apply Hequiv. eapply (complete_monotone_is_equivalent); eauto.
   - intros a Hac.
     * intros HQa. apply Hequiv in HQa. eapply (complete_antitone_is_equivalent); eauto.
 Defined.
 
-#[export] 
-Instance IncRefEqFun {A} `{Refinable A} `{Complete A} 
-  {B} `{Refinable B} 
+#[export]
+Instance IncRefEqFun {A} `{Refinable A} `{Complete A}
+  {B} `{Refinable B}
   {C} `{Refinable C}
-  (f g : A -> B -> C) {Hmono : IncRef (fun a => forall b, f a b = g a b)} 
+  (f g : A -> B -> C) {Hmono : IncRef (fun a => forall b, f a b = g a b)}
   : IncRef (fun a => f a = g a).
 Proof.
   eapply IncRefEquiv.
   - apply Hmono.
   - intros; split.
     * intros. apply functional_extensionality; eauto.
-    * intros ->; eauto. 
+    * intros ->; eauto.
 Defined.
 
-#[export] 
+#[export]
 Instance IncRefEqR {A} `{Refinable A} `{Complete A} {B} `{HB : CompleteMinimal B}
-  (f : A -> B) (Hcf : is_complete f) (Hmonof : is_monotone f) 
+  (f : A -> B) (Hcf : is_complete f) (Hmonof : is_monotone f)
   (b : B) : IncRef (fun a => b = f a).
 Proof.
   eapply IncRefEquiv with (P := (fun a => f a = b)); try intuition.
   eapply IncRefEqL; eauto.
-Defined.  
+Defined.
