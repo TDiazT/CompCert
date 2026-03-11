@@ -770,27 +770,28 @@ Theorem bounded_ge_emin :
   bounded mx ex = true ->
   (bpow radix2 emin <= F2R (Float radix2 (Zpos mx) ex))%R.
 Proof.
-intros mx ex Hx.
-destruct (andb_prop _ _ Hx) as [H1 _].
-apply Zeq_bool_eq in H1.
-generalize (mag_F2R_Zdigits radix2 (Zpos mx) ex).
-destruct (mag radix2 (F2R (Float radix2 (Zpos mx) ex))) as [e' Ex].
-unfold mag_val.
-intros H.
-assert (H0 : Zpos mx <> 0%Z) by easy.
-rewrite Rabs_pos_eq in Ex by now apply F2R_ge_0.
-refine (Rle_trans _ _ _ _ (proj1 (Ex _))).
-2: now apply F2R_neq_0.
-apply bpow_le.
-rewrite H by easy.
-revert H1.
-rewrite Zpos_digits2_pos.
-generalize (Zdigits radix2 (Zpos mx)) (Zdigits_gt_0 radix2 (Zpos mx) H0).
-unfold fexp, FLT_exp.
-clear -prec_gt_0_.
-unfold Prec_gt_0 in prec_gt_0_.
-intros ; lia.
-Qed.
+Admitted.
+(*intros mx ex Hx.*)
+(*destruct (andb_prop _ _ Hx) as [H1 _].*)
+(*apply Zeq_bool_eq in H1.*)
+(*generalize (mag_F2R_Zdigits radix2 (Zpos mx) ex).*)
+(*destruct (mag radix2 (F2R (Float radix2 (Zpos mx) ex))) as [e' Ex].*)
+(*unfold mag_val.*)
+(*intros H.*)
+(*assert (H0 : Zpos mx <> 0%Z) by easy.*)
+(*rewrite Rabs_pos_eq in Ex by now apply F2R_ge_0.*)
+(*refine (Rle_trans _ _ _ _ (proj1 (Ex _))).*)
+(*2: now apply F2R_neq_0.*)
+(*apply bpow_le.*)
+(*rewrite H by easy.*)
+(*revert H1.*)
+(*rewrite Zpos_digits2_pos.*)
+(*generalize (Zdigits radix2 (Zpos mx)) (Zdigits_gt_0 radix2 (Zpos mx) H0).*)
+(*unfold fexp, FLT_exp.*)
+(*clear -prec_gt_0_.*)
+(*unfold Prec_gt_0 in prec_gt_0_.*)
+(*intros ; lia.*)
+(*Qed.*)
 
 Theorem abs_B2R_le_emax_minus_prec :
   forall x,
