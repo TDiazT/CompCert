@@ -181,23 +181,26 @@ Definition analyze (f: function) (dm: defmap) (approx: PMap.t VA.t): option (PMa
               (transfer f dm approx).
 
 (** * Part 2: the code transformation *)
+Sort Exc.
+
+Symbol (raise@{u} : forall (A : Type@{Exc;u}), A).
 
 Definition transf_instr (dm: defmap) (approx: PMap.t VA.t) (an: PMap.t NA.t)
                         (pc: node) (instr: instruction) :=
   match instr with
-  | Iop op args res s =>
-      let nres := nreg (fst an!!pc) res in
-      if is_dead nres then
-        Inop s
-      else if is_int_zero nres then
-        Iop (Ointconst Int.zero) nil res s
-      else if operation_is_redundant op nres then
-        match args with
-        | arg :: _ => Iop Omove (arg :: nil) res s
-        | nil => instr
-        end
-      else
-        instr
+  | Iop op args res s => raise instruction
+      (*let nres := nreg (fst an!!pc) res in*)
+      (*if is_dead nres then*)
+      (*  Inop s*)
+      (*else if is_int_zero nres then*)
+      (*  Iop (Ointconst Int.zero) nil res s*)
+      (*else if operation_is_redundant op nres then*)
+      (*  match args with*)
+      (*  | arg :: _ => Iop Omove (arg :: nil) res s*)
+      (*  | nil => instr*)
+      (*  end*)
+      (*else*)
+      (*  instr*)
   | Iload chunk addr args dst s =>
       let ndst := nreg (fst an!!pc) dst in
       if is_dead ndst then

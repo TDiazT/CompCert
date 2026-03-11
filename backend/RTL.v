@@ -36,6 +36,9 @@ Require Import Op Registers.
 
 Definition node := positive.
 
+Set Universe Polymorphism.
+Unset Collapse Sorts ToType.
+
 Inductive instruction: Type :=
   | Inop: node -> instruction
       (** No operation -- just branch to the successor. *)
@@ -79,6 +82,8 @@ Inductive instruction: Type :=
       (** [Ireturn] terminates the execution of the current function
           (it has no successor).  It returns the value of the given
           register, or [Vundef] if none is given. *)
+
+Unset Universe Polymorphism.
 
 Definition code: Type := PTree.t instruction.
 

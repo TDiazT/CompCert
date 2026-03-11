@@ -42,12 +42,16 @@ Local Unset Case Analysis Schemes.
 
 Set Implicit Arguments.
 
-(** * The abstract signatures of trees *)
+Set Universe Polymorphism.
+Unset Collapse Sorts ToType.
 
+(** * The abstract signatures of trees *)
 Module Type TREE.
   Parameter elt: Type.
+  (*Parameter elt@{s;u}: Type@{s;u}.*)
   Parameter elt_eq: forall (a b: elt), {a = b} + {a <> b}.
   Parameter t: Type -> Type.
+  (*Parameter t@{s;u}: Type@{s;u} -> Type@{s;u}.*)
   Parameter empty: forall (A: Type), t A.
   Parameter get: forall (A: Type), elt -> t A -> option A.
   Parameter set: forall (A: Type), elt -> A -> t A -> t A.
@@ -150,6 +154,7 @@ End TREE.
 
 Module Type MAP.
   Parameter elt: Type.
+  (*Parameter elt@{s;u}: Type@{s;u}.*)
   Parameter elt_eq: forall (a b: elt), {a = b} + {a <> b}.
   Parameter t: Type -> Type.
   Parameter init: forall (A: Type), A -> t A.
@@ -210,7 +215,29 @@ Module PTree <: TREE.
   Arguments Empty {A}.
   Arguments Nodes {A} _.
 
-  Scheme tree'_ind := Induction for tree' Sort Prop.
+  (*Scheme tree'_ind := Induction for tree' Sort Prop.*)
+  Definition tree'_ind := fun (A : Type) (P : tree' A -> Prop)
+  (Node001 : forall t : tree' A, P t -> P (Node001 t))
+  (Node010 : forall a : A, P (Node010 a))
+  (Node011 : forall (a : A) (t : tree' A), P t -> P (Node011 a t))
+  (Node100 : forall t : tree' A, P t -> P (Node100 t))
+  (Node101 : forall t : tree' A,
+             P t -> forall t0 : tree' A, P t0 -> P (Node101 t t0))
+  (Node110 : forall t : tree' A, P t -> forall a : A, P (Node110 t a))
+  (Node111 : forall t : tree' A,
+             P t -> forall (a : A) (t0 : tree' A), P t0 -> P (Node111 t a t0)) =>
+fix F (t : tree' A) : P t :=
+  match t as t0 return P t0 with
+  | PTree.Node001 t0 => Node001 t0 (F t0)
+  | PTree.Node010 a => Node010 a
+  | PTree.Node011 a t0 => Node011 a t0 (F t0)
+  | PTree.Node100 t0 => Node100 t0 (F t0)
+  | PTree.Node101 t0 t1 => Node101 t0 (F t0) t1 (F t1)
+  | PTree.Node110 t0 a => Node110 t0 (F t0) a
+  | PTree.Node111 t0 a t1 => Node111 t0 (F t0) a t1 (F t1)
+  end.
+
+  Register Scheme tree'_ind as ind_dep for tree'.
 
   Definition t := tree.
 
@@ -445,10 +472,12 @@ Module PTree <: TREE.
     | _, _, _ => True
     end.
 
+  Unset Universe Polymorphism.
   (** A case analysis principle *)
 
   Section TREE_CASE.
-
+  (*Sort s.*)
+  (*Universe u.*)
   Context {A B: Type}
           (empty: B)
           (node: tree A -> option A -> tree A -> B).
@@ -632,9 +661,9 @@ Module PTree <: TREE.
   - symmetry. apply extensionality_empty. intros; symmetry; apply H0.
   - apply extensionality_empty. apply H0.
   - f_equal.
-    + apply IHm1_1. intros. specialize (H1 (xO i)); rewrite ! gNode in H1. auto.
+    + apply IHm1. intros. specialize (H1 (xO i)); rewrite ! gNode in H1. auto.
     + specialize (H1 xH); rewrite ! gNode in H1. auto.
-    + apply IHm1_2. intros. specialize (H1 (xI i)); rewrite ! gNode in H1. auto.
+    + apply IHm0. intros. specialize (H1 (xI i)); rewrite ! gNode in H1. auto.
   Qed.
 
   (** Some consequences of extensionality *)
@@ -969,8 +998,8 @@ Module PTree <: TREE.
     intros A. induction m using tree_ind; intros.
   - discriminate.
   - rewrite xelements_Node, ! in_app. rewrite gNode in H0. destruct i.
-    + right; right. apply (IHm2 i (xI j)); auto.
-    + left. apply (IHm1 i (xO j)); auto.
+    + right; right. apply (IHm0 i (xI j)); auto.
+    + left. apply (IHm i (xO j)); auto.
     + right; left. subst o. rewrite prev_append_prev. auto with coqlib.
   Qed.
 
@@ -990,9 +1019,9 @@ Module PTree <: TREE.
     intros A. induction m using tree_ind; intros.
   - elim H.
   - rewrite xelements_Node, ! in_app in H0. destruct H0 as [P | [P | P]].
-    + exploit IHm1; eauto. intros (j & Q & R). exists (xO j); rewrite gNode; auto.
+    + exploit IHm; eauto. intros (j & Q & R). exists (xO j); rewrite gNode; auto.
     + destruct o; simpl in P; intuition auto. inv H0. exists xH; rewrite gNode; auto.
-    + exploit IHm2; eauto. intros (j & Q & R). exists (xI j); rewrite gNode; auto.
+    + exploit IHm0; eauto. intros (j & Q & R). exists (xI j); rewrite gNode; auto.
   Qed.
 
   Theorem elements_complete:
